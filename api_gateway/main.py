@@ -25,6 +25,3 @@ def favicon_point():
     return Response(status_code=status.HTTP_200_OK)
 
 
-@app.get("/favicon.ic")
-def favicon_poin():
-    return Response(status_code=status.HTTP_200_OK)
