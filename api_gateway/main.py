@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Response, status
 
+from .authentication.api.router import auth
 from .routes import (
     upload_proxy
 )
@@ -18,6 +19,7 @@ app = FastAPI(
 
 
 app.include_router(upload_proxy.upload)
+app.include_router(auth)
 
 
 @app.get("/favicon.ico")

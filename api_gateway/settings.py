@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     DB_PORT: int
     POSTGRES_URL: str
 
+    ACCESS_TOKEN_EXPIRE_MINUTE: int
+
     model_config = SettingsConfigDict(
 
         env_file=Path(__file__).resolve().parents[0]/".env",

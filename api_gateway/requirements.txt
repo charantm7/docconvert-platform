@@ -2,10 +2,14 @@ fastapi[all]
 sqlalchemy
 pydantic
 dotenv
+passlib[bcrypt]
 alembic
 psycopg2
-passlib[bcrypt]
 authlib
 google-auth
 python-jose[cryptography]
 pydantic-settings
+sqladmin
+pyjwt
+pytz
+redis
