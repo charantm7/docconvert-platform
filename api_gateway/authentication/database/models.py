@@ -1,11 +1,12 @@
 import enum
 
 import sqlalchemy
-from .connection import Base
 from uuid import uuid4
 from sqlalchemy import Column, ForeignKey, String, Boolean, Date, Enum, DateTime
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, CITEXT
 from sqlalchemy.sql import func
+
+from api_gateway.authentication.database.connection import Base
 
 
 class AuthProviders(str, enum.Enum):

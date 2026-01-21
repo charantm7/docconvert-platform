@@ -1,86 +1,62 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from ..database.connection import get_db
-from ..database.models import User, AuthProviders
-from ..database.repository import UserRepository
-from .schema import SignupSchema, LoginSchema, TokenResponse
-from .security import verify_hash, create_access_token
+from api_gateway.authentication.database.connection import get_db
+from api_gateway.authentication.database.models import User, AuthProviders
+from api_gateway.authentication.database.repository import UserRepository
+from api_gateway.authentication.api.schema import SignupSchema, LoginSchema, TokenResponse
+from api_gateway.authentication.api.security import verify_hash, create_access_token, create_hash
 
 auth = APIRouter()
 
 
-@auth.post("/login", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@auth.post(
+    "/login",
+    response_model=TokenResponse,
+    status_code=status.HTTP_201_CREATED
+)
 async def login(
     data: LoginSchema,
     db: Session = Depends(get_db)
 ):
     repo = UserRepository(db=db)
-    # query the mail
+
     user = repo.get_by_email(data.email)
 
-    # if not found -> error/ signup /wrong email /user not registered
     if not user or not verify_hash(data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Invalid Credentials")
 
-    access_token = await create_access_token(subject=str(user.id))
+    access_token = create_access_token(subject=str(user.id))
 
     return {'access_token': access_token}
 
 
-@auth.post('/signup')
+@auth.post(
+    '/signup',
+    response_model=TokenResponse,
+    status_code=status.HTTP_201_CREATED
+)
 async def signup(
     data: SignupSchema,
     db: Session = Depends(get_db)
 ):
+    repo = UserRepository(db=db)
 
-    # check if the user registered already
-    user = db.query(User).filter(User.email == data.email).one_or_none()
-
-    if user:
+    if repo.exist_by_email(data.email):
         raise HTTPException(
-            status_code=status.HTTP_406_NOT_ACCEPTABLE,
+            status_code=status.HTTP_409_CONFLICT,
             detail="User already exits"
         )
 
-    if data.confirm_password != data.password:
-        raise HTTPException(
-            status_code=status.HTTP_406_NOT_ACCEPTABLE,
-            detail="Password doesn't match"
-        )
-
-    new = User(data.model_dump_json())
-
-    db.add(new)
-    db.commit()
-    db.refresh()
-
-    #  check that if confirm pass is as the password
-
-    return {
-        'email': new.email,
-        'first_name': new.first_name
-    }
-
-
-@auth.post('/update')
-async def update(db: Session = Depends(get_db)):
-    email = "charantm@gmail.com"
-    password = 'charantm'
-    first_name = 'charan tm'
-    primary_provider = AuthProviders.LocalAuthentication
-    last_login_provider = AuthProviders.LocalAuthentication
-
-    new = User(
-        email=email,
-        password=password,
-        first_name=first_name,
-        primary_provider=primary_provider,
-        last_login_provider=last_login_provider
+    user = repo.create(
+        email=data.email,
+        hashed_password=create_hash(data.password),
+        first_name=data.first_name,
+        last_name=data.last_name,
+        date_of_birth=data.date_of_birth
     )
 
-    db.add(new)
+    access_token = create_access_token(subject=str(user.id))
 
-    db.commit()
-    return "user added successful"
+    return {'access_token': access_token}

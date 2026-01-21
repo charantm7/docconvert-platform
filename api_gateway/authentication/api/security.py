@@ -7,8 +7,8 @@ from datetime import datetime, timezone, timedelta
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from ...settings import settings
-from ..database.models import RefreshToken
+from api_gateway.settings import settings
+from api_gateway.authentication.database.models import RefreshToken
 
 
 hashing_context = CryptContext(
@@ -18,19 +18,25 @@ hashing_context = CryptContext(
 )
 
 
-async def create_hash(data: str):
+def create_hash(data: str):
     return hashing_context.hash(data)
 
 
-async def verify_hash(password: str, hashed: str):
-    return hashing_context.verify(password, hashed)
+def verify_hash(password: str, hashed: str):
+    try:
+        return hashing_context.verify(password, hashed)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(e)
+        )
 
 
-async def hash_refersh_token(data: str):
+def hash_refersh_token(data: str):
     return hashlib.sha256(data.encode()).hexdigest()
 
 
-async def create_access_token(
+def create_access_token(
         subject: str,
         expire_delta: timedelta | None = None
 ) -> str:
@@ -41,8 +47,8 @@ async def create_access_token(
 
     payload = {
         "sub": subject,
-        "expire": expire,
-        "iat": datetime.now(timezone.utc),
+        "expire": int(expire.timestamp()),
+        "iat": int(datetime.now(timezone.utc).timestamp()),
         "type": "access"
     }
 
@@ -53,11 +59,11 @@ async def create_access_token(
     )
 
 
-async def create_refersh_token(db: Session, user_id):
+def create_refersh_token(db: Session, user_id):
 
     refresh_token = secrets.token_urlsafe(32)
 
-    hashed_refersh_token = await hash_refersh_token(data=refresh_token)
+    hashed_refersh_token = hash_refersh_token(data=refresh_token)
 
     refresh_db = RefreshToken(
         user_id=user_id,

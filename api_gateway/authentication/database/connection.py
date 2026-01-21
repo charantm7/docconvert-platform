@@ -1,8 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
-from ...settings import settings
-
+from api_gateway.settings import settings
 
 engine = create_engine(
     settings.POSTGRES_URL,

@@ -3,7 +3,8 @@ from datetime import date
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from .models import User
+
+from api_gateway.authentication.database.models import User
 
 
 class UserRepository:
@@ -51,3 +52,8 @@ class UserRepository:
     def exist_by_email(self, email: str) -> bool:
         stmt = select(User.id).where(User.email == email)
         return self.db.execute(stmt).first() is not None
+
+    def update_credentials(
+        self,
+
+    )
