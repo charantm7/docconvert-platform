@@ -4,6 +4,7 @@ import uuid
 import jwt
 from passlib.context import CryptContext
 from datetime import datetime, timezone, timedelta
+from jinja2 import FileSystemLoader, select_autoescape, Environment
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -19,12 +20,22 @@ hashing_context = CryptContext(
     bcrypt__ident="2b"
 )
 
+env = Environment(
+    loader=FileSystemLoader("../templates"),
+    autoescape=select_autoescape(["html", "xml"])
+)
 
-def create_hash(data: str):
+
+def render_email_template(template_name: str, context: dict):
+    template = env.get_template(template_name)
+    return template.render(context)
+
+
+def create_password_hash(data: str):
     return hashing_context.hash(data)
 
 
-def verify_hash(password: str, hashed: str):
+def verify_password_hash(password: str, hashed: str):
     try:
         return hashing_context.verify(password, hashed)
     except Exception as e:
@@ -34,7 +45,7 @@ def verify_hash(password: str, hashed: str):
         )
 
 
-def hash_refersh_token(data: str):
+def hash_token(data: str):
     return hashlib.sha256(data.encode()).hexdigest()
 
 
@@ -65,7 +76,7 @@ def create_refersh_token(db: Session, user_id):
 
     refresh_token = secrets.token_urlsafe(32)
 
-    hashed_refersh_token = hash_refersh_token(data=refresh_token)
+    hashed_refersh_token = hash_token(data=refresh_token)
 
     refresh_db = RefreshToken(
         user_id=user_id,
@@ -79,14 +90,8 @@ def create_refersh_token(db: Session, user_id):
     return refresh_token
 
 
-def create_email_verification_token(user_id: uuid.UUID) -> str:
-    payload = {
-        "sub": user_id,
-        "type": "email_verification",
-        "exp": int((datetime.now(timezone.utc) + timedelta(minutes=30)).timestamp())
-    }
-
-    return jwt.encode(payload, settings.JWT_SECRETE, settings.JWT_ALGORITHM)
+def create_email_verification_token() -> str:
+    return secrets.token_urlsafe(32)
 
 
 def validate_jwt_token(token: str, db: Session):

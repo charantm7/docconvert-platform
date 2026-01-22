@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Response, status
+from fastapi.staticfiles import StaticFiles
 
 from .authentication.api.router import auth
 from .routes import (
@@ -15,6 +16,12 @@ app = FastAPI(
         "email": "charanntm.dev@gmail.com"
     }
 
+)
+
+app.mount(
+    "/static",
+    StaticFiles(directory="./authentication/static"),
+    name='static'
 )
 
 

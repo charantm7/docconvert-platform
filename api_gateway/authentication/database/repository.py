@@ -4,7 +4,7 @@ from datetime import date, datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from api_gateway.authentication.database.models import AuthProviders, User
+from api_gateway.authentication.database.models import AuthProviders, User, EmailVerificationToken
 
 
 class UserRepository:
@@ -47,3 +47,23 @@ class UserRepository:
         user.last_loggin_at = datetime.now(timezone.utc)
         user.last_login_provider = provider
         self.db.commit()
+
+    def update_email_verification_status(self, user_id: uuid.UUID) -> None:
+        user = self.db.execute(
+            select(User).where(User.id == user_id)
+        )
+
+
+class EmailRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def create(self, **fields) -> None:
+        token = EmailVerificationToken(**fields)
+        self.db.add(token)
+        self.db.commit()
+
+    def is_token_exists(self, hashed_token: str) -> EmailVerificationToken:
+        stmt = select(EmailVerificationToken).where(
+            EmailVerificationToken.hashed_token == hashed_token)
+        return self.db.execute(stmt).first()

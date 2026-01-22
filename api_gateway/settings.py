@@ -1,3 +1,4 @@
+from smtplib import SMTP_PORT
 from pydantic_settings import BaseSettings,  SettingsConfigDict
 from pathlib import Path
 
@@ -18,7 +19,14 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str
     JWT_SECRETE: str
 
-    FRONTEND_URL: str
+    REDIRECT_URL: str
+
+    EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTE: int
+
+    SMTP_HOST: str
+    SMTP_PORT: int
+    EMAIL_FROM: str
+    EMAIL_PASSWORD: str
 
     model_config = SettingsConfigDict(
 

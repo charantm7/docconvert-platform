@@ -102,3 +102,15 @@ class RefreshToken(Base):
         PG_UUID(as_uuid=True),
         ForeignKey("users.id", ondelete='CASCADE')
     )
+
+
+class EmailVerificationToken(Base):
+    __tablename__ = "email_verification_tokens"
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True,
+                unique=True, nullable=False)
+    hashed_token = Column(String, nullable=False, index=True, unique=True)
+    user_id = Column(PG_UUID(as_uuid=True), ForeignKey(
+        "users.id", ondelete="CASCADE"))
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used = Column(Boolean, default=False)
