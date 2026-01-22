@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, status, BackgroundTasks
@@ -111,7 +112,7 @@ class EmailService:
 
         send_email_verification_link(verification_link, user.email)
 
-    def validate_email_verification_link(self, token: str):
+    def validate_email_verification_link(self, token: str) -> json:
         hashed_token = self._issue_hashed_token(token)
 
         token_record = self.email_repo.is_token_exists(hashed_token)
@@ -127,6 +128,11 @@ class EmailService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Link Expired"
             )
+
+        self.user_repo.update_email_verification_status(token_record.user_id)
+        self.email_repo.update_token_record_status(token_record)
+
+        return {"message": "Email Verification Successful"}
 
     # Internal helpers
 

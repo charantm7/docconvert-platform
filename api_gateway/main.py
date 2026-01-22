@@ -20,7 +20,7 @@ app = FastAPI(
 
 app.mount(
     "/static",
-    StaticFiles(directory="./authentication/static"),
+    StaticFiles(directory="api_gateway/authentication/static"),
     name='static'
 )
 

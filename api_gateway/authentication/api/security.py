@@ -21,7 +21,7 @@ hashing_context = CryptContext(
 )
 
 env = Environment(
-    loader=FileSystemLoader("../templates"),
+    loader=FileSystemLoader("api_gateway/authentication/templates"),
     autoescape=select_autoescape(["html", "xml"])
 )
 

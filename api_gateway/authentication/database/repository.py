@@ -49,9 +49,9 @@ class UserRepository:
         self.db.commit()
 
     def update_email_verification_status(self, user_id: uuid.UUID) -> None:
-        user = self.db.execute(
-            select(User).where(User.id == user_id)
-        )
+        user = self.get_by_id(user_id)
+        user.is_verified = True
+        self.db.commit()
 
 
 class EmailRepository:
@@ -66,4 +66,8 @@ class EmailRepository:
     def is_token_exists(self, hashed_token: str) -> EmailVerificationToken:
         stmt = select(EmailVerificationToken).where(
             EmailVerificationToken.hashed_token == hashed_token)
-        return self.db.execute(stmt).first()
+        return self.db.execute(stmt).scalar_one_or_none()
+
+    def update_token_record_status(self, record: EmailVerificationToken) -> None:
+        record.used = True
+        self.db.commit()
