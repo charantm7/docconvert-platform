@@ -1,16 +1,20 @@
 import json
 import uuid
 from datetime import datetime, timedelta, timezone
-from fastapi import HTTPException, status, BackgroundTasks
+from fastapi import HTTPException, status, BackgroundTasks, Depends
+from sqlalchemy.orm import Session
 
 from api_gateway.authentication.api.security import (
     create_access_token,
     create_email_verification_token,
     create_password_hash,
     hash_token,
-    verify_password_hash
+    validate_jwt_token,
+    verify_password_hash,
+    oauth2_scheme
 )
 from api_gateway.authentication.api.tasks import send_email_verification_link
+from api_gateway.authentication.database.connection import get_db
 from api_gateway.authentication.database.models import AuthProviders, User
 from api_gateway.authentication.database.repository import EmailRepository, UserRepository
 from api_gateway.authentication.api.schema import SignupSchema, LoginSchema
@@ -93,6 +97,39 @@ class AuthService:
             )
 
 
+class UserService:
+    def __init__(self, db=None):
+        self.db = db
+
+    def get_current_user(
+        self,
+        token: str = Depends(oauth2_scheme),
+        db: Session = Depends(get_db)
+    ) -> User:
+        payload = validate_jwt_token(token)
+
+        try:
+            user_id = uuid.UUID(payload["sub"])
+        except (KeyError, ValueError):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token payload",
+            )
+        user = UserRepository(db).get_by_id(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found",
+            )
+
+        if getattr(user, "is_active", True) is False:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User account is inactive",
+            )
+        return user
+
+
 class EmailService:
     def __init__(self, db):
         self.user_repo = UserRepository(db)
@@ -134,7 +171,13 @@ class EmailService:
 
         return {"message": "Email Verification Successful"}
 
-    # Internal helpers
+    def resend_verification_link(self, user: User, backround_task: BackgroundTasks) -> None:
+        if user.is_email_verified:
+            return
+
+        now = datetime.now(timezone.utc)
+
+        # Internal helpers
 
     def _issue_hashed_token(self, token: str) -> str:
         return hash_token(token)

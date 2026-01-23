@@ -53,10 +53,19 @@ class User(TimestampMixin, Base):
 
     date_of_birth = Column(Date, nullable=True)
 
-    is_verified = Column(
+    is_email_verified = Column(
         Boolean,
         server_default=sqlalchemy.false(),
         nullable=False
+    )
+    email_verified_at = Column(
+        DateTime(timezone=True),
+        nullable=True
+    )
+
+    email_verification_sent_at = Column(
+        DateTime(timezone=True),
+        nullable=True
     )
 
     primary_provider = Column(

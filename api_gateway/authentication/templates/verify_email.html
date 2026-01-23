@@ -2,65 +2,256 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Email Verification</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Verify your email - DocConvert</title>
   </head>
-  <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f6f6f6">
-    <div
-      style="
-        max-width: 600px;
-        margin: auto;
-        background-color: #ffffff;
-        border-radius: 10px;
-        overflow: hidden;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-      "
-    >
-      <!-- Top section -->
-      <div style="background-color: #222; color: #fff; padding: 20px; text-align: center">
-        <h2 style="margin: 0">API Authentication System</h2>
-        <img
-          src="https://cdn-icons-png.flaticon.com/512/2250/2250206.png"
-          alt="Verification"
-          style="width: 100%; max-height: 300px; object-fit: cover; margin-top: 10px; border-radius: 5px"
-        />
-      </div>
+  <body
+    style="
+      margin: 0;
+      padding: 0;
+      background-color: #f4f6f8;
+      font-family:
+        -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, &quot;Helvetica Neue&quot;, Arial,
+        sans-serif;
+    "
+  >
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f6f8">
+      <tr>
+        <td align="center" style="padding: 40px 20px">
+          <!-- Main container -->
+          <table
+            width="100%"
+            cellpadding="0"
+            cellspacing="0"
+            border="0"
+            style="
+              max-width: 600px;
+              background-color: #ffffff;
+              border-radius: 12px;
+              overflow: hidden;
+              box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+            "
+          >
+            <!-- Header with branding -->
+            <tr>
+              <td
+                style="
+                  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+                  padding: 40px 30px;
+                  text-align: center;
+                "
+              >
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td align="center">
+                      <div
+                        style="
+                          width: 64px;
+                          height: 64px;
+                          background-color: rgba(255, 255, 255, 0.15);
+                          border-radius: 16px;
+                          display: inline-flex;
+                          align-items: center;
+                          justify-content: center;
+                          margin-bottom: 16px;
+                        "
+                      >
+                        <svg
+                          width="36"
+                          height="36"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                            stroke="white"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                          />
+                        </svg>
+                      </div>
+                      <h1
+                        style="
+                          margin: 0;
+                          font-size: 28px;
+                          font-weight: 700;
+                          color: #ffffff;
+                          letter-spacing: -0.5px;
+                        "
+                      >
+                        DocConvert
+                      </h1>
+                      <p style="margin: 8px 0 0; font-size: 14px; color: rgba(255, 255, 255, 0.85)">
+                        Professional Document Conversion
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
 
-      <!-- Mid section -->
-      <div style="padding: 30px 20px; text-align: center">
-        <p style="font-weight: bold; color: #333; font-size: 16px">YOU'RE ONE STEP AWAY!</p>
-        <h1 style="color: #111; font-size: 24px">Verify your email address</h1>
-        <p style="color: #555; font-size: 15px; line-height: 1.5">
-          To get access into the <b>DeadBox Application</b>, please verify your email.
-        </p>
-        <a
-          href="{{ verification_link }}"
-          style="
-            display: inline-block;
-            margin-top: 20px;
-            padding: 12px 24px;
-            font-size: 16px;
-            background-color: #007bff;
-            color: #fff;
-            border-radius: 5px;
-            text-decoration: none;
-          "
-          >Verify</a
-        >
-      </div>
+            <!-- Main content -->
+            <tr>
+              <td style="padding: 48px 40px">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="text-align: center">
+                      <h2
+                        style="
+                          margin: 0 0 16px;
+                          font-size: 26px;
+                          font-weight: 600;
+                          color: #111827;
+                          line-height: 1.3;
+                        "
+                      >
+                        Verify Your Email Address
+                      </h2>
+                      <p style="margin: 0 0 28px; font-size: 16px; color: #6b7280; line-height: 1.6">
+                        Welcome to DocConvert! To complete your registration and start converting documents,
+                        please verify your email address.
+                      </p>
+                    </td>
+                  </tr>
 
-      <!-- Bottom section -->
-      <div
-        style="
-          border-top: 1px solid #eee;
-          padding: 15px 20px;
-          text-align: center;
-          font-size: 13px;
-          color: #999;
-        "
-      >
-        <p>Contact: charanntm.dev@gmail.com</p>
-        <p>All rights reserved &copy; DeadBox</p>
-      </div>
-    </div>
+                  <!-- Verification button -->
+                  <tr>
+                    <td align="center" style="padding: 12px 0 28px">
+                      <a
+                        href="{{verification_link}}"
+                        style="
+                          display: inline-block;
+                          padding: 16px 48px;
+                          background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+                          color: #ffffff;
+                          font-size: 16px;
+                          font-weight: 600;
+                          text-decoration: none;
+                          border-radius: 8px;
+                          box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+                          transition: all 0.3s ease;
+                        "
+                      >
+                        Verify Email Address
+                      </a>
+                    </td>
+                  </tr>
+
+                  <!-- Expiration notice -->
+                  <tr>
+                    <td style="text-align: center">
+                      <div
+                        style="
+                          background-color: #fef3c7;
+                          border-left: 4px solid #f59e0b;
+                          border-radius: 6px;
+                          padding: 16px 20px;
+                          margin: 0 0 24px;
+                        "
+                      >
+                        <p style="margin: 0; font-size: 14px; color: #92400e; line-height: 1.5">
+                          <strong>⏱️ This verification link expires in 30 minutes</strong>
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+
+                  <!-- Alternative text link -->
+                  <tr>
+                    <td style="text-align: center; padding-top: 12px; border-top: 1px solid #e5e7eb">
+                      <p style="margin: 0 0 8px; font-size: 13px; color: #9ca3af">
+                        Button not working? Copy and paste this link:
+                      </p>
+                      <p style="margin: 0; font-size: 12px; word-break: break-all">
+                        <a href="{{verification_link}}" style="color: #2563eb; text-decoration: underline">
+                          {{verification_link}}
+                        </a>
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- Security notice -->
+            <tr>
+              <td style="background-color: #f9fafb; padding: 24px 40px">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td>
+                      <p style="margin: 0 0 12px; font-size: 13px; color: #374151; font-weight: 600">
+                        🔒 Security Note
+                      </p>
+                      <p style="margin: 0; font-size: 13px; color: #6b7280; line-height: 1.6">
+                        We never ask for your password via email. If you didn't create an account with
+                        DocConvert, please disregard this email or contact our support team.
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+              <td style="background-color: #111827; padding: 32px 40px; text-align: center">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="padding-bottom: 16px">
+                      <p style="margin: 0 0 8px; font-size: 14px; color: #d1d5db">Need help?</p>
+                      <p style="margin: 0">
+                        <a
+                          href="mailto:support@docconvert.com"
+                          style="color: #60a5fa; text-decoration: none; font-size: 14px"
+                        >
+                          support@docconvert.com
+                        </a>
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="border-top: 1px solid #374151; padding-top: 16px">
+                      <p style="margin: 0; font-size: 12px; color: #9ca3af; line-height: 1.6">
+                        © 2026 DocConvert. All rights reserved.<br />
+                        123 Tech Street, San Francisco, CA 94105
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+
+          <!-- Privacy notice -->
+          <table
+            width="100%"
+            cellpadding="0"
+            cellspacing="0"
+            border="0"
+            style="max-width: 600px; margin-top: 20px"
+          >
+            <tr>
+              <td align="center">
+                <p style="margin: 0; font-size: 11px; color: #9ca3af; line-height: 1.5">
+                  This email was sent to {{user_email}} because you started the registration process on
+                  DocConvert.
+                </p>
+                <p style="margin: 8px 0 0; font-size: 11px; color: #9ca3af">
+                  <a href="{{privacy_policy_link}}" style="color: #6b7280; text-decoration: underline"
+                    >Privacy Policy</a
+                  >
+                  •
+                  <a href="{{terms_link}}" style="color: #6b7280; text-decoration: underline"
+                    >Terms of Service</a
+                  >
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
   </body>
 </html>

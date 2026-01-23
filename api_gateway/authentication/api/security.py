@@ -8,6 +8,7 @@ from jinja2 import FileSystemLoader, select_autoescape, Environment
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
+from fastapi.security import OAuth2PasswordBearer
 
 from api_gateway.authentication.database.repository import UserRepository
 from api_gateway.settings import settings
@@ -23,6 +24,11 @@ hashing_context = CryptContext(
 env = Environment(
     loader=FileSystemLoader("api_gateway/authentication/templates"),
     autoescape=select_autoescape(["html", "xml"])
+)
+
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="auth/login",
+    auto_error=True
 )
 
 
@@ -94,32 +100,29 @@ def create_email_verification_token() -> str:
     return secrets.token_urlsafe(32)
 
 
-def validate_jwt_token(token: str, db: Session):
+def validate_jwt_token(token: str):
+    try:
 
-    payload = jwt.decode(
-        token,
-        settings.JWT_SECRETE,
-        algorithms=['HS256']
-    )
-
-    if payload.get("type") != "email_verification":
+        payload = jwt.decode(
+            token,
+            settings.JWT_SECRETE,
+            algorithms=['HS256']
+        )
+    except jwt.ExpiredSignatureError:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid token"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token expired",
+        )
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
         )
 
-    user = UserRepository(db).get_by_id(payload['sub'])
-
-    if not user:
-        HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User not found"
+    if payload.get("type") != "access":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token type",
         )
 
-    if user.is_verified:
-        return {"message": "Email already verified"}
-
-    user.is_verified = True
-    db.commit()
-
-    return {"message": "Email verified successfully"}
+    return payload
