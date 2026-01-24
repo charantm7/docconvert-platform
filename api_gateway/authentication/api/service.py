@@ -20,6 +20,8 @@ from api_gateway.authentication.database.repository import EmailRepository, User
 from api_gateway.authentication.api.schema import SignupSchema, LoginSchema
 from api_gateway.settings import settings
 
+VERIFICATION_RESEND_COOLDOWN = timedelta(minutes=5)
+
 
 class AuthService:
 
@@ -134,6 +136,7 @@ class EmailService:
     def __init__(self, db):
         self.user_repo = UserRepository(db)
         self.email_repo = EmailRepository(db)
+        self.email_service = EmailService(db)
 
     def create_and_send_email_verification(self, user: User) -> None:
         token = create_email_verification_token()
@@ -167,6 +170,7 @@ class EmailService:
             )
 
         self.user_repo.update_email_verification_status(token_record.user_id)
+        self.user_repo.update_email_verified_at(token_record.user_id)
         self.email_repo.update_token_record_status(token_record)
 
         return {"message": "Email Verification Successful"}
@@ -176,6 +180,22 @@ class EmailService:
             return
 
         now = datetime.now(timezone.utc)
+
+        if (
+            user.email_verification_sent_at and now -
+                user.email_verification_sent_at < VERIFICATION_RESEND_COOLDOWN
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Please wait before requesting another verification email",
+            )
+
+        backround_task.add_task(
+            self.email_service.create_and_send_email_verification,
+            user
+        )
+
+        self.user_repo.update_email_verification_sent_at(user)
 
         # Internal helpers
 

@@ -53,6 +53,15 @@ class UserRepository:
         user.is_verified = True
         self.db.commit()
 
+    def update_email_verification_sent_at(self, user: User) -> None:
+        user.email_verification_sent_at = datetime.now(timezone=True)
+        self.db.commit()
+
+    def update_email_verified_at(self, user_id: uuid.UUID) -> None:
+        user = self.get_by_id(user_id)
+        user.email_verified_at = datetime.now(timezone=True)
+        self.db.commit()
+
 
 class EmailRepository:
     def __init__(self, db: Session):
