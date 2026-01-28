@@ -155,6 +155,8 @@ async def github_callback(request: Request, db: Session = Depends(get_db)):
 
         email_data = await Oauth2.oauth.github.get('user/emails', token=token)
         emails = email_data.json()
+        user = user_data.json()
+
         return {'user': user_data.json(), 'email': emails}
 
     except Exception as e:
@@ -179,6 +181,9 @@ async def twitter_callback(request: Request):
             token=token,
             params={"user.fields": "id,name,username,profile_image_url"}
         )
-        return user.json()
+        user_info = user.json()
+        username = user_info['data']['username']
+
+        return user_info
     except Exception as e:
         return str(e)

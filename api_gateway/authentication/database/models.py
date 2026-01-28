@@ -38,6 +38,7 @@ class User(TimestampMixin, Base):
                 default=uuid4, unique=True)
 
     email = Column(CITEXT, unique=True, index=True, nullable=False)
+    username = Column(String, unique=True, nullable=True)
 
     hashed_password = Column(
         String(255),
@@ -56,7 +57,7 @@ class User(TimestampMixin, Base):
     is_email_verified = Column(
         Boolean,
         server_default=sqlalchemy.false(),
-        nullable=False
+        nullable=True
     )
     email_verified_at = Column(
         DateTime(timezone=True),
