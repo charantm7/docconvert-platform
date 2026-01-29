@@ -37,7 +37,7 @@ class User(TimestampMixin, Base):
     id = Column(PG_UUID(as_uuid=True), primary_key=True,
                 default=uuid4, unique=True)
 
-    email = Column(CITEXT, unique=True, index=True, nullable=False)
+    email = Column(CITEXT, unique=True, index=True, nullable=True)
     username = Column(String, unique=True, nullable=True)
 
     hashed_password = Column(

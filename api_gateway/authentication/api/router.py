@@ -149,19 +149,40 @@ async def github_login(request: Request):
 
 @auth.get('/github/callback')
 async def github_callback(request: Request, db: Session = Depends(get_db)):
-    try:
-        token = await Oauth2.oauth.github.authorize_access_token(request)
-        user_data = await Oauth2.oauth.github.get('user', token=token)
+    repo = UserRepository(db)
 
-        email_data = await Oauth2.oauth.github.get('user/emails', token=token)
-        emails = email_data.json()
-        user = user_data.json()
+    token = await Oauth2.oauth.github.authorize_access_token(request)
+    user_data = await Oauth2.oauth.github.get('user', token=token)
 
-        return {'user': user_data.json(), 'email': emails}
+    email_data = await Oauth2.oauth.github.get('user/emails', token=token)
+    emails = email_data.json()
+    user = user_data.json()
 
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    verified_email = [
+        item['email']
+        for item in emails
+        if item.get('primary') is True
+    ]
+    picture = user['avatar_url']
+    about = user['bio']
+    first_name = user['name']
+
+    user = repo.get_by_email(verified_email[0])
+    if not user:
+        user = repo.create(
+            email=verified_email[0],
+            first_name=first_name,
+            is_email_verified=True,
+            picture=picture,
+            primary_provider=AuthProviders.GitHub,
+            last_login_provider=AuthProviders.GitHub,
+            about=about
+        )
+
+    access_token = security.create_access_token(subject=str(user.id))
+    refresh_token = security.create_refersh_token(db, user.id)
+
+    return {'access_token': access_token, 'refresh_token': refresh_token, 'token_type': 'Bearer'}
 
 
 @auth.get("/twitter/login")

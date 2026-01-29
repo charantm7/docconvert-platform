@@ -82,11 +82,11 @@ def create_refersh_token(db: Session, user_id):
 
     refresh_token = secrets.token_urlsafe(32)
 
-    hashed_refersh_token = hash_token(data=refresh_token)
+    hashed_refresh_token = hash_token(data=refresh_token)
 
     refresh_db = RefreshToken(
         user_id=user_id,
-        hashed_refersh_token=hashed_refersh_token,
+        hashed_refresh_token=hashed_refresh_token,
         expire_at=datetime.now(timezone.utc) + timedelta(days=7)
     )
 
