@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from api_gateway.authentication.api.security import (
     create_access_token,
+    create_refersh_token,
     create_email_verification_token,
     create_password_hash,
     create_password_reset_token,
@@ -61,6 +62,7 @@ class AuthService:
     """
 
     def __init__(self, db):
+        self.db = db
         self.repo = UserRepository(db)
         self.email_service = EmailService(db)
 
@@ -78,7 +80,8 @@ class AuthService:
             user
         )
         self.repo.update_email_verification_sent_at(user)
-        return self._issue_token(user)
+        access_token, refresh_token = self._issue_token(user)
+        return {'access_token': access_token, "refresh_token": refresh_token}
 
     def login(self, data: LoginSchema) -> str:
 
@@ -89,7 +92,9 @@ class AuthService:
             provider=AuthProviders.LocalAuthentication,
             user=user
         )
-        return self._issue_token(user)
+        self.repo.update_email_verification_sent_at(user)
+        access_token, refresh_token = self._issue_token(user)
+        return {'access_token': access_token, "refresh_token": refresh_token}
 
     def create_and_send_password_reset_link(self, email: str):
 
@@ -189,7 +194,9 @@ class AuthService:
         return self.repo.create(**payload)
 
     def _issue_token(self, user: User) -> str:
-        return create_access_token(subject=str(user.id))
+        refresh_token = create_refersh_token(self.db, user.id)
+        access_token = create_access_token(subject=str(user.id))
+        return access_token, refresh_token
 
     def _ensure_user_availability_and_verify_password(self, user: User, data: LoginSchema) -> None:
         if not user or not verify_password_hash(data.password, user.hashed_password):
@@ -197,6 +204,12 @@ class AuthService:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid Credentials"
             )
+
+
+class OauthService:
+    def __init__(self, db):
+        self.user_repo = UserRepository(db)
+        pass
 
 
 class EmailService:

@@ -26,6 +26,10 @@ class UserRepository:
         exc = select(User).where(User.email == email)
         return self.db.execute(exc).scalar_one_or_none()
 
+    def get_by_username(self, username: str) -> User | None:
+        exc = select(User).where(User.username == username)
+        return self.db.execute(exc).scalar_one_or_none()
+
     # Commands
 
     def create(self, **fields) -> User:

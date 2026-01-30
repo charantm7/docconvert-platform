@@ -22,7 +22,7 @@ async def login(
     data: LoginSchema,
     db: Session = Depends(get_db)
 ):
-    return {'access_token': AuthService(db).login(data)}
+    return AuthService(db).login(data)
 
 
 @auth.post(
@@ -35,10 +35,10 @@ async def signup(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
-    return {'access_token': AuthService(db).signup(
+    return AuthService(db).signup(
         data=data,
         background_tasks=background_tasks
-    )}
+    )
 
 
 @auth.post(
@@ -194,7 +194,8 @@ async def twitter_login(request: Request):
 
 
 @auth.get("/twitter/callback")
-async def twitter_callback(request: Request):
+async def twitter_callback(request: Request, db: Session = Depends(get_db)):
+    repo = UserRepository(db)
     try:
         token = await Oauth2.oauth.twitter.authorize_access_token(request)
         user = await Oauth2.oauth.twitter.get(
@@ -204,7 +205,23 @@ async def twitter_callback(request: Request):
         )
         user_info = user.json()
         username = user_info['data']['username']
+        picture = user_info['data']['profile_image_url']
+        first_name = user_info['data']['name']
 
-        return user_info
+        user = repo.get_by_username(username)
+        if not user:
+            user = repo.create(
+                first_name=first_name,
+                is_email_verified=True,
+                picture=picture,
+                primary_provider=AuthProviders.Twitter,
+                last_login_provider=AuthProviders.Twitter,
+                username=username
+            )
+
+        access_token = security.create_access_token(subject=str(user.id))
+        refresh_token = security.create_refersh_token(db, user.id)
+
+        return {'access_token': access_token, 'refresh_token': refresh_token, 'token_type': 'Bearer'}
     except Exception as e:
         return str(e)

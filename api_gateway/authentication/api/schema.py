@@ -5,6 +5,7 @@ from pydantic import BaseModel, EmailStr, field_validator, model_validator
 
 class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str = 'bearer'
 
 
