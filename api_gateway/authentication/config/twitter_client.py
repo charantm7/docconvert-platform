@@ -20,7 +20,7 @@ class TwitterOAuthClient:
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Twitter user not found"
+                detail="Twitter user info not found"
             )
 
         return user.json()
