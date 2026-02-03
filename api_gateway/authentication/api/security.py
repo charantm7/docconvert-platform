@@ -57,6 +57,7 @@ def hash_token(data: str):
 
 def create_access_token(
         subject: str,
+        role: str,
         expire_delta: timedelta | None = None
 ) -> str:
 
@@ -68,7 +69,8 @@ def create_access_token(
         "sub": subject,
         "expire": int(expire.timestamp()),
         "iat": int(datetime.now(timezone.utc).timestamp()),
-        "type": "access"
+        "type": "access",
+        "role": role
     }
 
     return jwt.encode(

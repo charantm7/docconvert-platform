@@ -61,8 +61,8 @@ def get_current_user(
 class TokenService:
 
     @staticmethod
-    def generate_tokens(user_id: uuid.UUID, db) -> dict:
-        access_token = create_access_token(str(user_id))
+    def generate_tokens(user_id: uuid.UUID, role: str, db) -> dict:
+        access_token = create_access_token(str(user_id), role=role)
         refresh_token = create_refersh_token(db, user_id)
 
         return {
@@ -209,7 +209,8 @@ class AuthService:
 
     def _issue_token(self, user: User) -> str:
         refresh_token = create_refersh_token(self.db, user.id)
-        access_token = create_access_token(subject=str(user.id))
+        access_token = create_access_token(
+            subject=str(user.id), role=user.role)
         return access_token, refresh_token
 
     def _ensure_user_availability_and_verify_password(self, user: User, data: LoginSchema) -> None:
@@ -309,7 +310,7 @@ class OauthService:
             self.user_repo.update_last_login(
                 provider=AuthProviders.Google, user=user)
 
-        return TokenService.generate_tokens(user.id, self.db)
+        return TokenService.generate_tokens(user_id=user.id, role=user.role, db=self.db)
 
     def _handle_github_users(self, user_info: dict):
         email = user_info['email']
@@ -335,7 +336,7 @@ class OauthService:
             self.user_repo.update_last_login(
                 provider=AuthProviders.GitHub, user=user)
 
-        return TokenService.generate_tokens(user.id, self.db)
+        return TokenService.generate_tokens(user_id=user.id, role=user.role, db=self.db)
 
     def _handle_twitter_user(self, user_info: dict) -> dict:
         username = user_info['data']['username']
@@ -361,7 +362,7 @@ class OauthService:
             self.user_repo.update_last_login(
                 provider=AuthProviders.Twitter, user=user)
 
-        return TokenService.generate_tokens(user.id, self.db)
+        return TokenService.generate_tokens(user_id=user.id, role=user.role, db=self.db)
 
 
 class EmailService:
