@@ -10,7 +10,6 @@ upload = APIRouter()
 @upload.api_route("/upload/{path:path}", methods=["GET", "POST"])
 async def proxy_upload(path: str, request: Request):
 
-    # filter the header
     forward_header = {
         key: value
         for key, value in request.headers.items()
