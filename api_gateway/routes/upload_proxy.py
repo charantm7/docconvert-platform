@@ -19,7 +19,7 @@ async def proxy_upload(path: str, request: Request):
             "connection"
         }
     }
-
+# dgf
     forward_header["User-Id"] = request.state.user_id
     forward_header["User-Role"] = request.state.role
     forward_header["Request-Id"] = request.state.request_id
