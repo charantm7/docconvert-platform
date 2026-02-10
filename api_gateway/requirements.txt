@@ -15,3 +15,5 @@ pytz
 redis
 jwt
 zxcvbn
+supabase
+python-multipart

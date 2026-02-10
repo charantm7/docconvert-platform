@@ -2,6 +2,15 @@ from fastapi import Request, HTTPException, status
 from starlette.middleware.base import BaseHTTPMiddleware
 from api_gateway.authentication.api.security import validate_jwt_token
 
+fr
+
+PUBLIC_PATHS = {
+    f"{sett}/auth/login",
+    f"/auth/signup",
+    f"/auth/refresh",
+    f"/health"
+}
+
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request,  call_next):
