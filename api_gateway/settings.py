@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     JWT_SECRETE: str
 
     REDIRECT_URL: str
+    PROXY_URL: str
 
     EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTE: int
     PASSWORD_RESET_TOKEN_EXPIRE_MINUTE: int

@@ -2,7 +2,7 @@ from fastapi import FastAPI, Response, status
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-from api_gateway.middleware.auth_middleware import AuthMiddleware
+
 from api_gateway.middleware.request_id_middleware import RequestIdMiddleware
 from api_gateway.settings import settings
 
@@ -36,7 +36,7 @@ app.add_middleware(
     same_site="lax",
     https_only=False,
 )
-app.add_middleware(AuthMiddleware)
+# app.add_middleware(AuthMiddleware)
 app.add_middleware(RequestIdMiddleware)
 
 

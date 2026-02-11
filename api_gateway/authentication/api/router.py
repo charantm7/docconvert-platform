@@ -10,13 +10,14 @@ from api_gateway.authentication.database.models import User, AuthProviders
 from api_gateway.authentication.database.repository import UserRepository
 from api_gateway.authentication.api.schema import SignupSchema, LoginSchema, TokenResponse, PasswordResetRequestSchema, PasswordResetSchema
 
-auth = APIRouter()
+auth = APIRouter(tags=["public"])
 
 
 @auth.post(
     "/login",
     response_model=TokenResponse,
-    status_code=status.HTTP_201_CREATED
+    status_code=status.HTTP_201_CREATED,
+    tags=["public"]
 )
 async def login(
     data: LoginSchema,
@@ -28,7 +29,8 @@ async def login(
 @auth.post(
     '/signup',
     response_model=TokenResponse,
-    status_code=status.HTTP_201_CREATED
+    status_code=status.HTTP_201_CREATED,
+    tags=["public"]
 )
 async def signup(
     data: SignupSchema,
@@ -42,7 +44,8 @@ async def signup(
 
 
 @auth.post(
-    "/verify-email"
+    "/verify-email",
+    tags=["public"]
 )
 async def verify_email(
     token: str,
@@ -52,7 +55,8 @@ async def verify_email(
 
 
 @auth.post(
-    "/resend-email-verification"
+    "/resend-email-verification",
+    tags=["public"]
 )
 async def resend_email_verification(
     background_task: BackgroundTasks,
@@ -65,7 +69,7 @@ async def resend_email_verification(
     )
 
 
-@auth.post("/reset-password-request")
+@auth.post("/reset-password-request", tags=["public"])
 async def reset_password_request(
     data: PasswordResetRequestSchema,
     db: Session = Depends(get_db)
@@ -73,7 +77,7 @@ async def reset_password_request(
     return AuthService(db).create_and_send_password_reset_link(data.email)
 
 
-@auth.post('/reset-password')
+@auth.post('/reset-password', tags=["public"])
 async def reset_password(
     token: str,
     data: PasswordResetSchema,
@@ -82,31 +86,31 @@ async def reset_password(
     return AuthService(db).reset_password_from_token(token, data)
 
 
-@auth.get('/google/login')
+@auth.get('/google/login', tags=["public"])
 async def google_login(request: Request):
     return await OauthService().google_login_service(request)
 
 
-@auth.get('/google/callback', response_model=TokenResponse)
+@auth.get('/google/callback', response_model=TokenResponse,  tags=["public"])
 async def google_callback(request: Request, db: Session = Depends(get_db)):
     return await OauthService(db).google_callback_service(request)
 
 
-@auth.get('/github/login')
+@auth.get('/github/login', tags=["public"])
 async def github_login(request: Request):
     return await OauthService().github_login_service(request)
 
 
-@auth.get('/github/callback', response_model=TokenResponse)
+@auth.get('/github/callback', response_model=TokenResponse,  tags=["public"])
 async def github_callback(request: Request, db: Session = Depends(get_db)):
     return await OauthService(db).github_callback_service(request)
 
 
-@auth.get("/twitter/login")
+@auth.get("/twitter/login", tags=["public"])
 async def twitter_login(request: Request):
     return await OauthService().twitter_login_service(request)
 
 
-@auth.get("/twitter/callback", response_model=TokenResponse)
+@auth.get("/twitter/callback", response_model=TokenResponse,  tags=["public"])
 async def twitter_callback(request: Request, db: Session = Depends(get_db)):
     return await OauthService(db).twitter_callback_service(request)

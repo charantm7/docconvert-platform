@@ -1,11 +1,11 @@
 
 import httpx
-from fastapi import APIRouter, Request, Response
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Request, Response, Depends
+from api_gateway.middleware.auth_middleware import require_auth
 
 from ..settings import settings
 
-upload = APIRouter()
+upload = APIRouter(dependencies=[Depends(require_auth)])
 
 
 @upload.post("/upload/presigned")
@@ -22,16 +22,15 @@ async def proxy_upload(request: Request):
         }
     }
     forward_header["User-Id"] = request.state.user_id
-    forward_header["User-Role"] = request.state.role
     forward_header["Request-Id"] = request.state.request_id
 
-    body = await request.body()
+    json_body = await request.json()
 
     async with httpx.AsyncClient(timeout=10) as client:
         upstream_response = await client.post(
             url=f"{settings.UPLOAD_SERVICE_URL}/upload/presigned",
             headers=forward_header,
-            content=body
+            json=json_body
         )
 
     return Response(

@@ -1,7 +1,10 @@
+import json
+import aio_pika
 from fastapi import APIRouter, HTTPException, Header, status
 
-from upload_service.src.api.v1.upload_route.schema import PreSignedSchema
+from upload_service.src.api.v1.upload_route.schema import PreSignedSchema, ConvertRequest
 from upload_service.src.api.v1.upload_route.service import build_storage_path
+from upload_service.src.config.rabbitmq_connection import get_rabbit_connection
 from upload_service.src.storage.supabase_client import supabase
 
 from upload_service.settings import settings
@@ -34,3 +37,26 @@ async def generate_presigned_url(
         "job_id": job_id,
         "bucket": settings.SUPABASE_BUCKET
     }
+
+
+@upload_service.post("/conversion/start")
+async def convert_file(body: ConvertRequest):
+
+    connection = await get_rabbit_connection()
+    channel = await connection.channel()
+
+    queue = await channel.declare_queue("conversion_queue", durable=True)
+
+    message = {
+        "job_id": body.job_id,
+        "path": body.path,
+        "target_format": body.target_format
+    }
+
+    await channel.declare_exchange.publish(
+        aio_pika.message(
+            body=json.dumps(message).encode(),
+            delivery_mode=aio_pika.DeliveryMode.PERSISTENT
+        ),
+        routing_key=queue.name
+    )

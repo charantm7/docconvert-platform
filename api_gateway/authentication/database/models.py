@@ -17,12 +17,6 @@ class AuthProviders(str, enum.Enum):
     Twitter = "Twitter"
 
 
-class Roles(str, enum.Enum):
-
-    Admin = "admin"
-    User = "user"
-
-
 class TimestampMixin:
     created_at = Column(
         DateTime(timezone=True),
@@ -59,10 +53,6 @@ class User(TimestampMixin, Base):
     picture = Column(String, nullable=True)
 
     date_of_birth = Column(Date, nullable=True)
-    role = Column(
-        Enum(Roles, name="application_role"),
-        nullable=True, default=Roles.User
-    )
 
     is_email_verified = Column(
         Boolean,
