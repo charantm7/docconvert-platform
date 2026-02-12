@@ -53,10 +53,14 @@ async def convert_file(body: ConvertRequest):
         "target_format": body.target_format
     }
 
-    await channel.declare_exchange.publish(
+    await channel.default_exchange.publish(
         aio_pika.message(
             body=json.dumps(message).encode(),
             delivery_mode=aio_pika.DeliveryMode.PERSISTENT
         ),
         routing_key=queue.name
     )
+
+    await connection.close()
+
+    return {"message": "Conversion job queued", "job_id": body.job_id}
