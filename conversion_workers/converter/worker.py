@@ -1,50 +1,153 @@
 import tempfile
-import os
-from pdf2docx import Converter
+import shutil
+import subprocess
+import time
+from pathlib import Path
+from typing import Optional
+from supabase import Client
 
-from conversion_workers.storage.s3_client import supabase
 from conversion_workers.settings import settings
 
+# Exceptions
 
-def convert_pdf_to_docx(job_id: str, path: str):
-    """
-    Docstring for convert_pdf_to_docx
 
-    :param job_id: Description
-    :type job_id: str
-    :param path: Description
-    :type path: str
+class LibreOfficeNotFoundError(Exception):
+    pass
 
-    PDF (supabase) -> DOX -> Supabase
-    """
 
-    print(f"[wroker] starting convertion for job id {job_id}")
+class ConversionTimeoutError(Exception):
+    pass
 
-    file_byte = supabase.storage.from_(
-        settings.SUPABASE_RAW_BUCKET).download(path=path)
 
-    with tempfile.TemporaryDirectory() as tempdir:
-        input_pdf = os.path.join(tempdir, "input.pdf")
-        output_docx = os.path.join(tempdir, "output.docx")
+class ConversionFailedError(Exception):
+    pass
 
-        with open(input_pdf, "wb") as f:
-            f.write(file_byte)
 
-        cv = Converter(input_pdf)
-        cv.convert(output_docx)
-        cv.close()
+class LibreOfficeConverter:
 
-        print(f"[worker] conversion finished for job {job_id}")
+    def __init__(
+        self,
+        soffice_path: Optional[str] = None,
+        timeout_seconds: int = 120,
+    ):
+        self.soffice_path = soffice_path or self._detect_soffice()
+        self.timeout_second = timeout_seconds
 
-        output_storage_path = path.replace("original.pdf", "converted.docx")
+    def convert(self, input_path: Path, output_dir: Path, target_ext: str) -> Path:
 
-        with open(output_docx, "rb") as f:
-            supabase.storage.from_(settings.SUPABASE_CONVERTED_BUCKET).upload(
-                output_storage_path,
-                f,
-                {
-                    "content-type":
-                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                },
+        convert_arg = target_ext
+        if target_ext.lower() == "docx":
+            convert_arg = 'docx:"MS Word 2007 XML"'
+
+        cmd = [
+            self.soffice_path,
+            "--headless",
+            "--nologo",
+            "--nofirststartwizard",
+            "--norestore",
+            "--convert-to",
+            convert_arg,
+            "--outdir",
+            str(output_dir),
+            str(input_path)
+
+        ]
+
+        try:
+            result = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=self.timeout_second,
+                check=True
             )
-    print(f"[worker] upload complete for job id {job_id}")
+        except subprocess.TimeoutExpired as e:
+            raise ConversionTimeoutError(
+                "LibreOffice Conversion timeout error") from e
+
+        except subprocess.CalledProcessError as e:
+            raise ConversionFailedError(
+                e.stderr.decode(errors="ignore")) from e
+
+        for file in output_dir.iterdir():
+            if file.suffix.lower() == f".{target_ext.lower()}":
+                return file
+
+        raise ConversionFailedError(
+            f"LibreOffice produced no output.\nSTDERR:\n{result.stderr.decode(errors='ignore')}"
+        )
+
+    def _detect_soffice(self) -> str:
+        candidates = [
+            shutil.which("soffice"),
+            "/usr/bin/soffice",
+            "/usr/local/bin/soffice",
+            "C:\\Program Files\\LibreOffice\\program\\soffice.exe",
+        ]
+
+        for path in candidates:
+            if path and Path(path).exists():
+                return str(path)
+        raise LibreOfficeNotFoundError(
+            "Libreoffice not installed in the system")
+
+
+class Conversion:
+    def __init__(self, supabase: Client):
+        self.supabase_client = supabase
+        self._libreoffice_converter = LibreOfficeConverter()
+
+    def convert_pdf_to_docx(self, job_id: str, path: str):
+        """
+        Docstring for convert_pdf_to_docx
+
+        :param job_id: Description
+        :type job_id: str
+        :param path: Description
+        :type path: str
+
+        PDF (supabase) -> DOX -> Supabase
+        """
+
+        print(f"[wroker] starting convertion for job id {job_id}")
+
+        file_byte = self.supabase_client.storage.from_(
+            settings.SUPABASE_RAW_BUCKET).download(path=path)
+
+        print("supabase path", path)
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            tempdir = Path(tempdir)
+
+            suffix = Path(path).suffix
+            input_pdf = tempdir / f"input{suffix}"
+            output_dir = tempdir
+
+            print("Temp input file:", input_pdf)
+            print("File size:", len(file_byte))
+
+            input_pdf.write_bytes(file_byte)
+
+            start = time.time()
+            output_file = self._libreoffice_converter.convert(
+                input_path=input_pdf,
+                output_dir=output_dir,
+                target_ext="docx"
+            )
+            duration = time.time() - start
+            print(
+                f"[worker] conversion finished for job {job_id} in {duration: .2f}s")
+
+            output_storage_path = path.replace(
+                "original.pdf", "converted.docx")
+
+            with open(output_file, "rb") as f:
+                self.supabase_client.storage.from_(settings.SUPABASE_CONVERTED_BUCKET).upload(
+                    output_storage_path,
+                    f,
+                    {
+                        "content-type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        "x-upsert": "true"
+                    },
+                )
+        print(f"[worker] upload complete for job {job_id}")

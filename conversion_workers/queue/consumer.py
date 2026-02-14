@@ -2,8 +2,9 @@ import asyncio
 import json
 import aio_pika
 
+from conversion_workers.storage.s3_client import supabase
 from conversion_workers.settings import settings
-from conversion_workers.converter.worker import convert_pdf_to_docx
+from conversion_workers.converter.worker import Conversion
 
 
 async def start_consumer():
@@ -31,7 +32,7 @@ async def start_consumer():
                     print(f'[worker] recieved job id {job_id}')
 
                     if target_format == "docx":
-                        convert_pdf_to_docx(job_id, path)
+                        Conversion(supabase).convert_pdf_to_docx(job_id, path)
                     else:
                         raise ValueError("Unsupported Formate")
 
