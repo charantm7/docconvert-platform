@@ -54,7 +54,7 @@ async def convert_file(body: ConvertRequest):
     }
 
     await channel.default_exchange.publish(
-        aio_pika.message(
+        aio_pika.Message(
             body=json.dumps(message).encode(),
             delivery_mode=aio_pika.DeliveryMode.PERSISTENT
         ),
