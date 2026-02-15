@@ -101,11 +101,6 @@ class Conversion:
         """
         Docstring for convert_pdf_to_docx
 
-        :param job_id: Description
-        :type job_id: str
-        :param path: Description
-        :type path: str
-
         PDF (supabase) -> DOX -> Supabase
         """
 
