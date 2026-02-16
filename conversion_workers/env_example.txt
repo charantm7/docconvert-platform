@@ -1,0 +1,8 @@
+SUPABASE_URL=https://your-supabase-url.supabase.co
+SUPABASE_SERVICE_KEY=your-supabase-service-key
+
+SUPABASE_CONVERTED_BUCKET=converted_bucket
+SUPABASE_RAW_BUCKET=raw_bucket
+
+RABBITMQ_URL=amqp://localhost:5672
+QUEUE_NAME=conversion_queue

@@ -4,7 +4,6 @@ pydantic
 dotenv
 passlib[bcrypt]
 alembic
-psycopg2
 authlib
 google-auth
 python-jose[cryptography]
