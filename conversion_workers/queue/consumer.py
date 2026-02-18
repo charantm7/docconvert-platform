@@ -33,6 +33,13 @@ async def start_consumer():
 
                     if target_format == "docx":
                         Conversion(supabase).convert_pdf_to_docx(job_id, path)
+                    
+                    elif target_format == "pdf":
+                        Conversion(supabase).convert_docx_to_pdf(job_id, path)
+
+                    elif target_format == "pptx":
+                        Conversion(supabase).convert_pdf_to_ppt(job_id, path)
+                    
                     else:
                         raise ValueError("Unsupported Formate")
 

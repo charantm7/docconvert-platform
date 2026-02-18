@@ -1,3 +1,4 @@
+from importlib.resources import files
 import tempfile
 import shutil
 import subprocess
@@ -6,22 +7,18 @@ import os
 from pathlib import Path
 from typing import Optional
 from supabase import Client
+from pdf2docx import Converter
 
 from conversion_workers.settings import settings
 
 # Exceptions
-
-
-class LibreOfficeNotFoundError(Exception):
-    pass
-
-
-class ConversionTimeoutError(Exception):
-    pass
-
-
-class ConversionFailedError(Exception):
-    pass
+from conversion_workers.exception import (
+    LibreOfficeNotFoundError,
+    FileNotFoundError,
+    ConversionTimeoutError,
+    ConversionFailedError,
+    UploadFailedError,
+)
 
 
 class LibreOfficeConverter:
@@ -36,35 +33,18 @@ class LibreOfficeConverter:
 
     def convert(self, input_path: Path, output_dir: Path, target_ext: str) -> Path:
 
-        convert_arg = target_ext
-        if target_ext.lower() == "docx":
-            convert_arg = "docx:MS Word 2007 XML"
-
-        lo_user_profile = output_dir / "lo_user_profile"
-        lo_user_profile.mkdir(exist_ok=True)
-
-        env = os.environ.copy()
-        env["HOME"] = str(output_dir)  # Changed back to output_dir
-        env["UserInstallation"] = f"file:///{lo_user_profile}"
-
         cmd = [
             self.soffice_path,
-            f"-env:UserInstallation=file:///{lo_user_profile}",
             "--headless",
             "--nologo",
             "--nofirststartwizard",
             "--norestore",
             "--convert-to",
-            convert_arg,
+            target_ext,
             "--outdir",
             str(output_dir),
             str(input_path)
         ]
-
-        print(f"[DEBUG] Running command: {' '.join(cmd)}")
-        print(f"[DEBUG] Input file exists: {input_path.exists()}")
-        print(f"[DEBUG] Input file size: {input_path.stat().st_size if input_path.exists() else 'N/A'}")
-        print(f"[DEBUG] Output dir writable: {os.access(output_dir, os.W_OK)}")
 
         try:
             result = subprocess.run(
@@ -73,10 +53,8 @@ class LibreOfficeConverter:
                 stderr=subprocess.PIPE,
                 timeout=self.timeout_second,
                 check=True,
-                env=env,
             )
-            print(f"[DEBUG] STDOUT: {result.stdout.decode(errors='ignore')}")
-            print(f"[DEBUG] STDERR: {result.stderr.decode(errors='ignore')}")
+    
         except subprocess.TimeoutExpired as e:
             raise ConversionTimeoutError(
                 "LibreOffice Conversion timeout error") from e
@@ -86,7 +64,6 @@ class LibreOfficeConverter:
             raise ConversionFailedError(
                 e.stderr.decode(errors="ignore")) from e
         
-        print(f"[DEBUG] Files in output_dir: {list(output_dir.iterdir())}")
         
         expected_output = output_dir / f"{input_path.stem}.{target_ext.lower()}"
         if expected_output.exists():
@@ -120,6 +97,121 @@ class Conversion:
         self.supabase_client = supabase
         self._libreoffice_converter = LibreOfficeConverter()
 
+    def convert_pdf_to_ppt(self, job_id: str, path:str):
+        """
+        Docstring for convert_pdf_to_ppt
+        
+        :param self: Description
+        :param job_id: Description
+        :type job_id: str
+        :param path: Description
+        :type path: str
+        Converter PDF (supabase) -> PPT -> Supabase
+        """
+
+        try:
+
+            file_byte = self.supabase_client.storage.from_(
+                settings.SUPABASE_RAW_BUCKET).download(path=path)   
+        except Exception as e:
+            print(f"[worker] error downloading file for job {job_id}: {str(e)}")
+            raise FileNotFoundError(f"File not found in storage: {path}") from e
+        
+        with tempfile.TemporaryDirectory() as tempdir:
+            tempdir = Path(tempdir)
+
+            suffix = Path(path).suffix.lower()
+
+            if suffix != ".pdf":
+                raise ConversionFailedError(f"Unsupported input format: {suffix}")
+            
+            input_pdf = tempdir / "input.pdf"
+            output_dir = tempdir / "output.pptx"
+
+            with open(input_pdf, "wb") as f:
+                f.write(file_byte)
+            
+            output_file = self._libreoffice_converter.convert(input_path=input_pdf, output_dir=output_dir, target_ext='pptx')
+
+            if not output_file.exists():    
+                raise ConversionFailedError("Conversion failed: No output file found")
+            output_storage_path = path.replace(
+                "original.pdf", "converted.pptx")
+            
+            try:
+                with open(output_file, "rb") as f:
+                    self.supabase_client.storage.from_(settings.SUPABASE_CONVERTED_BUCKET).upload(
+                        output_storage_path,
+                        f,
+                        {
+                            "content-type": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                            "x-upsert": "true"
+                        },
+                    )
+            except Exception as e:
+                print(f"[worker] error uploading file for job {job_id}: {str(e)}")
+                raise UploadFailedError(f"Upload failed: {str(e)}") from e
+        print(f"[worker] upload complete for job {job_id}")
+            
+    def convert_docx_to_pdf(self, job_id: str, path: str):
+        """
+        Docstring for convert_docx_to_pdf
+        
+        :param self: Description
+        :param job_id: Description
+        :type job_id: str
+        :param path: Description
+        :type path: str
+
+        Converter DOCX (supabase) -> PDF -> Supabase
+        """
+
+        try:
+
+            file_byte = self.supabase_client.storage.from_(
+                settings.SUPABASE_RAW_BUCKET).download(path=path)
+        except Exception as e:
+            print(f"[worker] error downloading file for job {job_id}: {str(e)}")
+            raise FileNotFoundError(f"File not found in storage: {path}") from e
+        
+        with tempfile.TemporaryDirectory() as tempdir:
+            tempdir = Path(tempdir)
+
+            suffix = Path(path).suffix.lower()
+
+            if suffix != ".docx":
+                raise ConversionFailedError(f"Unsupported input format: {suffix}")
+
+            input_docx = tempdir / 'input.docx'
+            output_dir = tempdir / "output.pdf"
+
+            with open(input_docx, "wb") as f:
+                f.write(file_byte)
+
+            output_file = self._libreoffice_converter.convert(input_path=input_docx, output_dir=output_dir, target_ext='pdf')
+
+            if not output_file.exists():
+                raise ConversionFailedError("Conversion failed: No output file found")
+            output_storage_path = path.replace(
+                "original.docx", "converted.pdf")
+            
+            try:
+                with open(output_file, "rb") as f:
+                    self.supabase_client.storage.from_(settings.SUPABASE_CONVERTED_BUCKET).upload(
+                        output_storage_path,
+                        f,
+                        {
+                            "content-type": "application/pdf",
+                            "x-upsert": "true"
+                        },
+                    )
+            except Exception as e:
+                print(f"[worker] error uploading file for job {job_id}: {str(e)}")
+                raise UploadFailedError(f"Upload failed: {str(e)}") from e
+        print(f"[worker] upload complete for job {job_id}")
+    
+                
+
     def convert_pdf_to_docx(self, job_id: str, path: str):
         """
         Docstring for convert_pdf_to_docx
@@ -129,9 +221,13 @@ class Conversion:
 
         print(f"[wroker] starting convertion for job id {job_id}")
 
-        file_byte = self.supabase_client.storage.from_(
-            settings.SUPABASE_RAW_BUCKET).download(path=path)
-        print(file_byte)
+        try:
+
+            file_byte = self.supabase_client.storage.from_(
+                settings.SUPABASE_RAW_BUCKET).download(path=path)
+        except Exception as e:
+            print(f"[worker] error downloading file for job {job_id}: {str(e)}")
+            raise FileNotFoundError(f"File not found in storage: {path}") from e
 
 
         with tempfile.TemporaryDirectory() as tempdir:
@@ -143,36 +239,40 @@ class Conversion:
                 raise ConversionFailedError(
                     f"Unsupported input format: {suffix}")
             
-            input_pdf = f"input.pdf"
-            output_dir = tempdir
+            input_pdf = Path(tempdir) / "input.pdf"
+            output_dir = Path(tempdir) / "output.docx"
 
-            print("Temp input file:", input_pdf)
-            print("File size:", len(file_byte))
-
-            input_pdf_path = tempdir / input_pdf
-            with open(input_pdf_path, "wb") as f:
+            with open(input_pdf, "wb") as f:
                 f.write(file_byte)
 
-            start = time.time()
-            output_file = self._libreoffice_converter.convert(
-                input_path=input_pdf_path,
-                output_dir=output_dir,
-                target_ext="docx"
-            )
-            duration = time.time() - start
-            print(
-                f"[worker] conversion finished for job {job_id} in {duration: .2f}s")
+            try:
+                cv = Converter(str(input_pdf))
+                cv.convert(str(output_dir))
+                cv.close()   
+            except Exception as e:
+                print(f"[worker] error during conversion for job {job_id}: {str(e)}")     
+                raise ConversionFailedError(f"Conversion failed: {str(e)}") from e
 
+
+            if not output_dir.exists():
+                raise ConversionFailedError("Conversion failed: No output file found")
+        
             output_storage_path = path.replace(
                 "original.pdf", "converted.docx")
+            
+            try:
 
-            with open(output_file, "rb") as f:
-                self.supabase_client.storage.from_(settings.SUPABASE_CONVERTED_BUCKET).upload(
-                    output_storage_path,
-                    f,
-                    {
-                        "content-type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        "x-upsert": "true"
-                    },
-                )
+                with open(output_dir, "rb") as f:
+                    self.supabase_client.storage.from_(settings.SUPABASE_CONVERTED_BUCKET).upload(
+                        output_storage_path,
+                        f,
+                        {
+                            "content-type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            "x-upsert": "true"
+                        },
+                    )
+            except Exception as e:
+                print(f"[worker] error uploading file for job {job_id}: {str(e)}")
+                raise UploadFailedError(f"Upload failed: {str(e)}") from e
+            
         print(f"[worker] upload complete for job {job_id}")
