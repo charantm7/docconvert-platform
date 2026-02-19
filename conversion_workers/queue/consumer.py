@@ -4,7 +4,7 @@ import aio_pika
 
 from conversion_workers.storage.s3_client import supabase
 from conversion_workers.settings import settings
-from conversion_workers.converter.worker import Conversion
+from conversion_workers.converter.worker import Conversion, Compression, Customization
 
 
 async def start_consumer():
@@ -39,6 +39,12 @@ async def start_consumer():
 
                     elif target_format == "pptx":
                         Conversion(supabase).convert_pdf_to_ppt(job_id, path)
+
+                    elif target_format == "merge":
+                        Customization(supabase).merge_pdf(job_id, path)
+
+                    elif target_format == "compress":
+                        Compression(supabase).compress_pdf(job_id, path)
                     
                     else:
                         raise ValueError("Unsupported Formate")

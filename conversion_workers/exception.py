@@ -13,3 +13,6 @@ class ConversionFailedError(Exception):
 
 class UploadFailedError(Exception):
     pass
+
+class CompressionFailedError(Exception):
+    pass

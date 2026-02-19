@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_KEY: str
     SUPABASE_CONVERTED_BUCKET: str
     SUPABASE_RAW_BUCKET: str
+    SUPABASE_COMPRESSED_BUCKET: str
 
     RABBITMQ_URL: str
     QUEUE_NAME: str

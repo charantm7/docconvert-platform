@@ -1,9 +1,9 @@
-from importlib.resources import files
 import tempfile
 import shutil
 import subprocess
 import time
 import os
+from pypdf import PdfWriter, PdfReader
 from pathlib import Path
 from typing import Optional
 from supabase import Client
@@ -18,6 +18,7 @@ from conversion_workers.exception import (
     ConversionTimeoutError,
     ConversionFailedError,
     UploadFailedError,
+    CompressionFailedError
 )
 
 
@@ -126,12 +127,14 @@ class Conversion:
                 raise ConversionFailedError(f"Unsupported input format: {suffix}")
             
             input_pdf = tempdir / "input.pdf"
-            output_dir = tempdir / "output.pptx"
+            output_dir = tempdir 
 
             with open(input_pdf, "wb") as f:
                 f.write(file_byte)
             
-            output_file = self._libreoffice_converter.convert(input_path=input_pdf, output_dir=output_dir, target_ext='pptx')
+            output_file = self._libreoffice_converter.convert(input_path=input_pdf, output_dir=output_dir, target_ext='odp')
+
+            output_file = self._libreoffice_converter.convert(input_path=output_file, output_dir=output_dir, target_ext='pptx')
 
             if not output_file.exists():    
                 raise ConversionFailedError("Conversion failed: No output file found")
@@ -276,3 +279,158 @@ class Conversion:
                 raise UploadFailedError(f"Upload failed: {str(e)}") from e
             
         print(f"[worker] upload complete for job {job_id}")
+
+
+class Compression:
+    def __init__(self, supabase: Client):
+        self.supabase_client = supabase
+
+    def compress_pdf(self, job_id: str, path: str, quality: str = "ebook", pdf_bytes: Optional[bytes] = None):
+        """
+        Docstring for compress_pdf
+
+        PDF (supabase) -> Compressed PDF -> Supabase
+        """
+        
+        print(f"[wroker] starting compression for job id {job_id}")
+
+        try:
+
+            file_byte = self.supabase_client.storage.from_(
+                settings.SUPABASE_RAW_BUCKET).download(path=path)
+        except Exception as e:
+            print(f"[worker] error downloading file for job {job_id}: {str(e)}")
+            raise FileNotFoundError(f"File not found in storage: {path}") from e
+
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            tempdir = Path(tempdir)
+
+            suffix = Path(path).suffix.lower()
+
+            if suffix != ".pdf":
+                raise ConversionFailedError(
+                    f"Unsupported input format: {suffix}")
+            
+            input_pdf = Path(tempdir) / "input.pdf"
+            output_pdf = Path(tempdir) / "compressed.pdf"
+
+            with open(input_pdf, "wb") as f:
+                f.write(file_byte)
+
+            result = subprocess.run(
+            [
+                "gs",
+                "-sDEVICE=pdfwrite",
+                "-dCompatibilityLevel=1.4",
+                f"-dPDFSETTINGS=/{quality}",
+                "-dNOPAUSE",
+                "-dQUIET",
+                "-dBATCH",
+                f"-sOutputFile={output_pdf}",
+                str(input_pdf),
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+            if result.returncode != 0:
+                print(f"[worker] error during compression for job {job_id}: {result.stderr.decode(errors='ignore')}")
+                raise CompressionFailedError(f"Compression failed: {result.stderr.decode(errors='ignore')}")
+            
+            if not output_pdf.exists():
+                raise CompressionFailedError("Compression failed: No output file found")
+            
+            output_storage_path = path.replace(
+                "original.pdf", "compressed.pdf")
+            
+            try:
+
+                with open(output_pdf, "rb") as f:
+                    self.supabase_client.storage.from_(settings.SUPABASE_COMPRESSED_BUCKET).upload(
+                        output_storage_path,
+                        f,
+                        {
+                            "content-type": "application/pdf",
+                            "x-upsert": "true"
+                        },
+                    )
+            except Exception as e:
+                print(f"[worker] error uploading file for job {job_id}: {str(e)}")
+                raise UploadFailedError(f"Upload failed: {str(e)}") from e  
+            
+        print(f"[worker] upload complete for job {job_id}")
+            
+
+class Customization:
+    def __init__(self, supabase: Client):
+        self.supabase_client = supabase
+
+    def merge_pdf(self, job_id: str, path: list[str]):
+        """
+        Docstring for merge_pdf
+
+        PDF (supabase) -> Merged PDF -> Supabase
+        """
+
+        file_bytes_list = self._download_pdf(job_id, path)
+
+        output_pdf_bytes = self._merge_pdfs(file_bytes_list)
+        output_storage_path = str(Path(path[0]).with_name('merged.pdf'))
+        try:
+            self.supabase_client.storage.from_(settings.SUPABASE_CONVERTED_BUCKET).upload(
+                output_storage_path,
+                output_pdf_bytes,
+                {
+                    "content-type": "application/pdf",
+                    "x-upsert": "true"
+                },
+            )
+        except Exception as e:
+            print(f"[worker] error uploading file for job {job_id}: {str(e)}")
+            raise UploadFailedError(f"Upload failed: {str(e)}") from e
+        print(f"[worker] upload complete for job {job_id}")
+
+    def _merge_pdfs(self, pdf_bytes_list: list[bytes]):
+
+        if len(pdf_bytes_list) < 2:
+            raise ValueError("At least two PDF files are required for merging.")
+        
+        with tempfile.TemporaryDirectory() as tempdir:
+            tempdir = Path(tempdir)
+
+            merger = PdfWriter()
+
+            for i, pdf_bytes in enumerate(pdf_bytes_list):
+                temp_pdf_path = tempdir / f"temp_{i}.pdf"
+                with open(temp_pdf_path, "wb") as f:
+                    f.write(pdf_bytes)
+                reader = PdfReader(str(temp_pdf_path))
+                merger.append(reader)
+
+            output_pdf_path = tempdir / "merged.pdf"
+            merger.write(str(output_pdf_path))
+            merger.close()
+
+            if not output_pdf_path.exists():
+                raise ConversionFailedError("Merging failed: No output file found")
+            
+            return output_pdf_path.read_bytes()
+
+        
+    def _download_pdf(self, job_id: str, path: list[str]) -> list[bytes]:
+        """
+        Docstring for download_pdf
+
+        PDF (supabase) -> bytes
+        """
+        pdf_bytes = []
+        for p in path:
+            try:
+
+                file_byte = self.supabase_client.storage.from_(
+                    settings.SUPABASE_RAW_BUCKET).download(path=p)
+                pdf_bytes.append(file_byte)
+            except Exception as e:
+                print(f"[worker] error downloading file for job {job_id}: {str(e)}")
+                raise FileNotFoundError(f"File not found in storage: {p}") from e
+        return pdf_bytes
