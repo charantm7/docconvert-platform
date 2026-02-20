@@ -37,7 +37,7 @@ async def generate_presigned_url(
         "job_id": job_id,
         "bucket": settings.SUPABASE_BUCKET
     }
-
+# TODO: Merge and conversion endpoints are very similar, can we combine them into one with a type field in the request body to differentiate between merge and conversion jobs?
 
 @upload_service.post("/merge/start")
 async def merge_files(body: MergeRequest):
