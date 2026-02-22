@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, status, BackgroundTasks, Depends
 from sqlalchemy.orm import Session
+import logging
 
 from api_gateway.authentication.api.security import (
     create_access_token,
@@ -15,16 +16,19 @@ from api_gateway.authentication.api.security import (
     verify_password_hash,
     oauth2_scheme
 )
-from api_gateway.authentication.api.tasks import send_email_verification_link, send_password_reset_link
+
+from api_gateway.settings import settings
 from api_gateway.authentication.config import Oauth2
+from api_gateway.authentication.database.connection import get_db
+from api_gateway.authentication.database.models import AuthProviders, User
 from api_gateway.authentication.config.github_client import GithubOAuthClient
 from api_gateway.authentication.config.google_client import GoogleOAuthClient
 from api_gateway.authentication.config.twitter_client import TwitterOAuthClient
-from api_gateway.authentication.database.connection import get_db
-from api_gateway.authentication.database.models import AuthProviders, User
 from api_gateway.authentication.database.repository import EmailRepository, UserRepository
+from api_gateway.authentication.api.tasks import send_email_verification_link, send_password_reset_link
 from api_gateway.authentication.api.schema import SignupSchema, LoginSchema, PasswordResetSchema, TokenResponse
-from api_gateway.settings import settings
+
+logger = logging.getLogger(__name__)
 
 VERIFICATION_RESEND_COOLDOWN = timedelta(minutes=5)
 PASSWORD_VERIFICATION_RESEND_COOLDOWN = timedelta(minutes=1)
@@ -76,7 +80,17 @@ class AuthService:
 
     """
     Service layer for Authentication
-    Handles all the business logic
+    Handles all the business logic for local authentication
+
+    Contains:
+
+    1) SignUp
+    2) Login
+    3) Send Reset Password Link
+    4) Reset Password from token
+
+    Error Handled = Done
+    Loggin = Done
     """
 
     def __init__(self, db):
@@ -85,12 +99,29 @@ class AuthService:
         self.email_service = EmailService(db)
 
     def signup(self, data: SignupSchema, background_tasks: BackgroundTasks) -> str:
+
+        logger.info(
+            "SignUp attempt",
+            extra={
+                "stage": "signup_attempt",
+                "email": data.email
+            }
+        )
+        
         self._ensure_email_not_taken(data.email)
         user = self._create_user(
             data,
             primary_provider=AuthProviders.LocalAuthentication,
             last_login_provider=AuthProviders.LocalAuthentication,
             last_login_at=datetime.now(timezone.utc)
+        )
+
+        logger.info(
+            "User created successfully",
+            extra={
+                "stage":"signup_success",
+                "user_id": user.id
+            }
         )
 
         background_tasks.add_task(
@@ -103,20 +134,61 @@ class AuthService:
 
     def login(self, data: LoginSchema) -> str:
 
+        logger.info(
+            "login attempt",
+            extra={
+                "stage":"login_attempt",
+                "email": data.email
+            }
+        )
+
         user = self.repo.get_by_email(data.email)
-        self._ensure_user_availability_and_verify_password(
+        try:
+            self._ensure_user_availability_and_verify_password(
             user=user, data=data)
+        except HTTPException:
+            logger.warning(
+                "Login Failed",
+                extra={
+                    "stage": "login_failed",
+                    "email": data.email
+                }
+            )
+            raise
         self.repo.update_last_login(
             provider=AuthProviders.LocalAuthentication,
             user=user
+        )
+
+        logger.info(
+            "Login successful",
+            extra={
+                "stage":"login_success",
+                "user_id": user.id
+            }
         )
         access_token, refresh_token = self._issue_token(user)
         return {'access_token': access_token, "refresh_token": refresh_token}
 
     def create_and_send_password_reset_link(self, email: str):
 
+        logger.info(
+            "Password reset requested",
+            extra={
+                "stage":"password_reset_request",
+                "email": email
+            }
+        )
+
         user = self.repo.get_by_email(email)
         if not user:
+            logger.warning(
+                "password reset requested for not existing user",
+                extra={
+                    "stage": "password_reset_user_not_found",
+                    "email": email
+                }
+            )
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found",
@@ -148,6 +220,14 @@ class AuthService:
         )
 
         send_password_reset_link(reset_link, email)
+        logger.info(
+            "password reset link sent",
+            extra={
+                "stage": "password_reset_link_sent",
+                "user_id": user.id
+            }
+        )
+        
         self.repo.update_password_reset_link_sent_at(user)
         return f"Reset Link sent to {email} successfully"
 
@@ -156,17 +236,36 @@ class AuthService:
         token: str,
         data: PasswordResetSchema
     ):
+        logger.info(
+            "password reset token validation attempt",
+            extra={
+                "stage": "password_reset_token_validation"
+            }
+        )
         hashed_token = hash_token(token)
 
         token_record = self.repo.is_password_reset_token_exists(hashed_token)
 
         if not token_record or token_record.used:
+            logger.warning(
+                "Invalid or used password reset token",
+                extra={
+                    "stage":"password_reset_invalid_token"
+                }
+            )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid Link"
             )
 
         if token_record.expires_at < datetime.now(timezone.utc):
+            logger.warning(
+                "Expired password reset token",
+                extra={
+                    "stage": "password_reset_token_expired",
+                    "user_id": token_record.user_id
+                }
+            )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Link Expired"
@@ -177,6 +276,13 @@ class AuthService:
         self.repo.update_password_reseted_at(user)
         self.repo.update_password_reset_token_status(token_record)
 
+        logger.info(
+            "Password reset successful",
+            extra={
+                "stage": "password_reset_success",
+                "user_id": token_record.user_id
+            }
+        )
         return "password reset successful"
 
     # Internal helpers
@@ -222,6 +328,17 @@ class AuthService:
 
 
 class OauthService:
+
+    """
+    This Service Handles all OAuth authentication
+
+    OAuth SignIn request -> Callback -> Token exchange -> Gets Access Token -> Fetch User
+
+    Error Handling = Done
+    Logging = Done
+    
+    """
+    
     def __init__(self, db=None):
         self.user_repo = UserRepository(db)
         self.db = db
@@ -231,18 +348,30 @@ class OauthService:
 
     # login controllers
     async def google_login_service(self, request):
+        logger.info(
+            "OAuth login redirect initiated",
+            extra={"stage": "oauth_google_redirect"}
+        )
         return await Oauth2.oauth.google.authorize_redirect(
             request,
             settings.GOOGLE_CALLBACK_REDIRECT_LINK
         )
 
     async def github_login_service(self, request):
+        logger.info(
+            "OAuth login redirect initiated",
+            extra={"stage": "oauth_github_redirect"}
+        )
         return await Oauth2.oauth.github.authorize_redirect(
             request,
             settings.GITHUB_CALLBACK_REDIRECT_LINK
         )
 
     async def twitter_login_service(self, request):
+        logger.info(
+            "OAuth login redirect initiated",
+            extra={"stage": "oauth_twitter_redirect"}
+        )
         return await Oauth2.oauth.twitter.authorize_redirect(
             request,
             settings.X_CALLBACK_REDIRECT_LINK
@@ -250,9 +379,22 @@ class OauthService:
 
     # callbacks
     async def google_callback_service(self, request) -> TokenResponse:
+        logger.info(
+            "OAuth Google callback recieved",
+            extra={
+                "stage": "oauth_google_callback"
+            }
+        )
         try:
             token = await Oauth2.oauth.google.authorize_access_token(request)
         except Exception as e:
+            logger.warning(
+                "OAuth Google exchange token failed",
+                extra={
+                    "stage": "oauth_google_token_failed",
+                    "error": str(e)
+                }
+            )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -265,10 +407,23 @@ class OauthService:
         return self._handle_google_user(google_user)
 
     async def github_callback_service(self, request) -> TokenResponse:
+        logger.info(
+            "OAuth GitHub callback recieved",
+            extra={
+                "stage": "oauth_google_callback"
+            }
+        )
         try:
             token = await Oauth2.oauth.github.authorize_access_token(request)
 
         except Exception as e:
+            logger.warning(
+                "OAuth GitHub exchange token failed",
+                extra={
+                    "stage": "oauth_github_token_failed",
+                    "error": str(e)
+                }
+            )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
         user = await self.github_auth_client.fetch_github_userinfo(token)
@@ -276,10 +431,24 @@ class OauthService:
         return self._handle_github_users(user)
 
     async def twitter_callback_service(self, request) -> TokenResponse:
+        logger.info(
+            "OAuth Twitter callback recieved",
+            extra={
+                "stage": "oauth_twitter_callback"
+            }
+        )
         try:
             token = await Oauth2.oauth.twitter.authorize_access_token(request)
         except Exception as e:
-            return str(e)
+            logger.warning(
+                "OAuth Twitter exchange token failed",
+                extra={
+                    "stage": "oauth_twitter_token_failed",
+                    "error": str(e)
+                }
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
         user = await self.twitter_auth_client.fetch_twitter_userinfo(token)
         return self._handle_twitter_user(user)
 
@@ -290,6 +459,10 @@ class OauthService:
         email = user_info.get('email')
 
         if not email or not user_id:
+            logger.warning(
+                "Invalid Google user payload",
+                extra={"stage":"oauth_google_invalid_payload"}
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid Google user data"
@@ -298,6 +471,10 @@ class OauthService:
         user = self.user_repo.get_by_email(email)
 
         if not user:
+            logger.info(
+                "Creating new user from google oauth",
+                extra={"stage":"oauth_google_user_creation"}
+            )
             user = self.user_repo.create(
                 email=email,
                 first_name=user_info.get('name'),
@@ -307,15 +484,33 @@ class OauthService:
                 last_login_provider=AuthProviders.Google
             )
         else:
+            logger.info(
+                "Google OAuth login for existing user",
+                extra={
+                    "stage": "oauth_google_existing_user",
+                    "user_id": user.id
+                }
+            )
             self.user_repo.update_last_login(
                 provider=AuthProviders.Google, user=user)
 
+        logger.info(
+            "OAuth Google login successful",
+            extra={
+                "stage": "oauth_google_success",
+                "user_id": user.id
+            }
+        )
         return TokenService.generate_tokens(user_id=user.id, db=self.db)
 
     def _handle_github_users(self, user_info: dict):
         email = user_info['email']
 
         if not email:
+            logger.warning(
+                "Invalid github user payload",
+                extra={"stage":"oauth_github_invalid_payload"}
+            )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid GitHub user data"
@@ -324,6 +519,10 @@ class OauthService:
         user = self.user_repo.get_by_email(email)
 
         if not user:
+            logger.info(
+                "Creating new user from Github oauth",
+                extra={"stage":"oauth_github_user_creation"}
+            )
             user = self.user_repo.create(
                 email=email,
                 first_name=user_info.get('name'),
@@ -333,23 +532,45 @@ class OauthService:
                 last_login_provider=AuthProviders.GitHub,
             )
         else:
+            logger.info(
+                "GitHub OAuth login for existing user",
+                extra={
+                    "stage": "oauth_github_existing_user",
+                    "user_id": user.id
+                }
+            )
             self.user_repo.update_last_login(
                 provider=AuthProviders.GitHub, user=user)
-
+            
+        logger.info(
+            "OAuth GitHub login successful",
+            extra={
+                "stage": "oauth_github_success",
+                "user_id": user.id
+            }
+        )
         return TokenService.generate_tokens(user_id=user.id, db=self.db)
 
     def _handle_twitter_user(self, user_info: dict) -> dict:
         username = user_info['data']['username']
 
         if not username:
+            logger.warning(
+                "Invalid twitter user payload",
+                extra={"stage":"oauth_twitter_invalid_payload"}
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid Google user data"
+                detail="Invalid twitter user data"
             )
 
         user = self.user_repo.get_by_username(username)
 
         if not user:
+            logger.info(
+                "Creating new user from twitter oauth",
+                extra={"stage":"oauth_twitter_user_creation"}
+            )
             user = self.user_repo.create(
                 username=username,
                 first_name=user_info['data']['name'],
@@ -359,13 +580,40 @@ class OauthService:
                 last_login_provider=AuthProviders.Twitter
             )
         else:
+            logger.info(
+                "Twitter OAuth login for existing user",
+                extra={
+                    "stage": "oauth_twitter_existing_user",
+                    "user_id": user.id
+                }
+            )
             self.user_repo.update_last_login(
                 provider=AuthProviders.Twitter, user=user)
-
+            
+        logger.info(
+            "OAuth twitter login successful",
+            extra={
+                "stage": "oauth_twitter_success",
+                "user_id": user.id
+            }
+        )
         return TokenService.generate_tokens(user_id=user.id, db=self.db)
 
 
 class EmailService:
+
+    """
+    Email service layer
+    This service handles all the business logic for email verification
+
+    Contains:
+
+    1) Send email verification Link
+    2) Validate email verification link
+    3) Resend email verification link
+    
+    """
+    
     def __init__(self, db):
         self.user_repo = UserRepository(db)
         self.email_repo = EmailRepository(db)

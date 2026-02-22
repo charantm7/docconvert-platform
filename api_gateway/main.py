@@ -2,7 +2,7 @@ from fastapi import FastAPI, Response, status
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-
+from common_logging.configuration import setup_logging
 from api_gateway.middleware.request_id_middleware import RequestIdMiddleware
 from api_gateway.settings import settings
 
@@ -10,6 +10,8 @@ from .authentication.api.router import auth
 from .routes import (
     upload_proxy
 )
+
+setup_logging(service_name="gateway")
 
 
 app = FastAPI(
