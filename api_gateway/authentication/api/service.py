@@ -98,38 +98,76 @@ class AuthService:
         self.repo = UserRepository(db)
         self.email_service = EmailService(db)
 
-    def signup(self, data: SignupSchema, background_tasks: BackgroundTasks) -> str:
+    def signup(self, data: SignupSchema, background_tasks: BackgroundTasks) -> dict:
 
         logger.info(
             "SignUp attempt",
             extra={
                 "stage": "signup_attempt",
-                "email": data.email
+                "email": data.email[:3] + "***"
             }
         )
         
         self._ensure_email_not_taken(data.email)
-        user = self._create_user(
-            data,
-            primary_provider=AuthProviders.LocalAuthentication,
-            last_login_provider=AuthProviders.LocalAuthentication,
-            last_login_at=datetime.now(timezone.utc)
-        )
+        try:
+            user = self._create_user(
+                data,
+                primary_provider=AuthProviders.LocalAuthentication,
+                last_login_provider=AuthProviders.LocalAuthentication,
+                last_login_at=datetime.now(timezone.utc)
+            )
+        except Exception:
+            logger.exception(
+                "New user creation failure at signup",
+                extra={"stage":"user_creation_failure_signup"}
+            )
+            raise
 
         logger.info(
             "User created successfully",
             extra={
-                "stage":"signup_success",
+                "stage":"user_created_success",
                 "user_id": user.id
             }
         )
 
-        background_tasks.add_task(
-            self.email_service.create_and_send_email_verification,
-            user
+        try:
+            access_token, refresh_token = self._issue_token(user)
+        except Exception:
+            logger.exception(
+                "Token generation failed during signup",
+                extra={
+                    "stage": "signup_token_failure",
+                    "user_id": user.id
+                }
+            )
+            raise
+
+        try:
+            self.repo.update_email_verification_sent_at(user)
+            background_tasks.add_task(
+                self.email_service.create_and_send_email_verification,
+                user
+            )
+        except Exception:
+            logger.exception(
+                "Failed to schedule email verification",
+                extra={
+                    "stage": "signup_email_schedule_failure",
+                    "user_id": user.id
+                }
+            )
+            raise
+        
+
+        logger.info(
+            "Signup successful",
+            extra={
+                "stage": "signup_success",
+                "user_id": user.id
+            }
         )
-        self.repo.update_email_verification_sent_at(user)
-        access_token, refresh_token = self._issue_token(user)
+        
         return {'access_token': access_token, "refresh_token": refresh_token}
 
     def login(self, data: LoginSchema) -> str:
@@ -147,10 +185,10 @@ class AuthService:
             self._ensure_user_availability_and_verify_password(
             user=user, data=data)
         except HTTPException:
-            logger.warning(
-                "Login Failed",
+            logger.exception(
+                "Login Failed due to credentials",
                 extra={
-                    "stage": "login_failed",
+                    "stage": "login_failed_on_credential",
                     "email": data.email
                 }
             )
@@ -176,7 +214,7 @@ class AuthService:
             "Password reset requested",
             extra={
                 "stage":"password_reset_request",
-                "email": email
+                "email": email[:3] + "****"
             }
         )
 
@@ -186,13 +224,9 @@ class AuthService:
                 "password reset requested for not existing user",
                 extra={
                     "stage": "password_reset_user_not_found",
-                    "email": email
                 }
             )
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found",
-            )
+            return "If the email exists, a reset link has been sent"
 
         now = datetime.now(timezone.utc)
 
@@ -200,6 +234,13 @@ class AuthService:
             user.password_reset_sent_at and now -
                 user.password_reset_sent_at < PASSWORD_VERIFICATION_RESEND_COOLDOWN
         ):
+            logger.warning(
+                "Password reset request cooldown failure",
+                extra={
+                    "stage":"password_reset_request_failure_cooldown_attempt",
+                    "user_id": user.id
+                }
+            )
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Please wait before requesting another Password reset link",
@@ -208,18 +249,35 @@ class AuthService:
         token = create_password_reset_token()
         hashed_token = hash_token(token)
 
-        self.repo.create_password_reset_record(
-            hashed_token=hashed_token,
-            user_id=user.id,
-            expires_at=(datetime.now(
-                timezone.utc) + timedelta(minutes=settings.PASSWORD_RESET_TOKEN_EXPIRE_MINUTE))
-        )
-
+        try:
+            self._create_password_reset_record(user, hashed_token)
+        except Exception:
+            logger.exception(
+                "Failed to create password reset record on db",
+                extra={
+                    "stage": "failed_to_create_password_reset_record_on_db",
+                    "email": email[:3] + "****"
+                }
+            )
+            raise
+        
         reset_link = (
             f"{settings.REDIRECT_URL}/reset-password?token={token}"
         )
+        try:
+            send_password_reset_link(reset_link, email)
+        except Exception:
+            logger.exception(
+                "Failed to send password reset email",
+                extra={
+                    "stage": "password_reset_email_failure",
+                    "user_id": user.id
+                }
+            )
+            raise
+        
+        self.repo.update_password_reset_link_sent_at(user)
 
-        send_password_reset_link(reset_link, email)
         logger.info(
             "password reset link sent",
             extra={
@@ -227,8 +285,6 @@ class AuthService:
                 "user_id": user.id
             }
         )
-        
-        self.repo.update_password_reset_link_sent_at(user)
         return f"Reset Link sent to {email} successfully"
 
     def reset_password_from_token(
@@ -326,6 +382,13 @@ class AuthService:
                 detail="Invalid Credentials"
             )
 
+    def _create_password_reset_record(self, user: User, hashed_token: str):
+        self.repo.create_password_reset_record(
+                hashed_token=hashed_token,
+                user_id=user.id,
+                expires_at=(datetime.now(
+                    timezone.utc) + timedelta(minutes=settings.PASSWORD_RESET_TOKEN_EXPIRE_MINUTE))
+            )
 
 class OauthService:
 

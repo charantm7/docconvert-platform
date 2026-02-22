@@ -1,7 +1,11 @@
+import logging
 from sqlalchemy import create_engine
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
 from api_gateway.settings import settings
+
+logger = logging.getLogger(__name__)
 
 engine = create_engine(
     settings.POSTGRES_URL,
@@ -23,6 +27,27 @@ def get_db():
 
     try:
         yield db
+    
+    except SQLAlchemyError:
+        logger.exception(
+            "Database session error occurred",
+            extra={"stage":"database_session_error"}
+        )
+        db.rollback()
+        raise
+    except Exception:
+        logger.exception(
+            "Unexpected error during DB session",
+            extra={"stage":"db_unexpected_error"}
+        )
+        db.rollback()
+        raise
 
     finally:
-        db.close()
+        try:
+            db.close()
+        except Exception:
+            logger.exception(
+                "Failed to close database session",
+                extra={"stage": "db_close_failure"}
+            )
