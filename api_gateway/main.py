@@ -10,6 +10,7 @@ from .authentication.api.router import auth
 from .routes import (
     upload_proxy
 )
+from api_gateway.handlers.exception_handlers import register_exception_handler
 
 setup_logging(service_name="gateway")
 
@@ -40,7 +41,7 @@ app.add_middleware(
 )
 # app.add_middleware(AuthMiddleware)
 app.add_middleware(RequestIdMiddleware)
-
+register_exception_handler(app)
 
 app.include_router(upload_proxy.upload)
 app.include_router(auth)

@@ -10,6 +10,7 @@ class AppError(Exception):
 
 
 class UserAlreadyExistsError(AppError): pass
+class UserNotFoundError(AppError): pass
 class UserCreationError(AppError): pass
 class TokenGenerationError(AppError): pass
 class EmailSchedulingError(AppError): pass

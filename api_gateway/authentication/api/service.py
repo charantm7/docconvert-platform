@@ -1,9 +1,9 @@
 import json
 import uuid
+import logging
+from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, status, BackgroundTasks, Depends
-from sqlalchemy.orm import Session
-import logging
 
 from api_gateway.authentication.api.security import (
     create_access_token,
@@ -17,8 +17,17 @@ from api_gateway.authentication.api.security import (
     oauth2_scheme
 )
 
+from api_gateway.handlers.exception import (
+    AppError,
+    TokenGenerationError,
+    UserAlreadyExistsError,
+    UserCreationError,
+    EmailSchedulingError
+)
+
 from api_gateway.settings import settings
 from api_gateway.authentication.config import Oauth2
+from api_gateway.handlers.decorators import log_service_action
 from api_gateway.authentication.database.connection import get_db
 from api_gateway.authentication.database.models import AuthProviders, User
 from api_gateway.authentication.config.github_client import GithubOAuthClient
@@ -90,7 +99,7 @@ class AuthService:
     4) Reset Password from token
 
     Error Handled = Done
-    Loggin = Done
+    Logging = Done
     """
 
     def __init__(self, db):
@@ -109,19 +118,13 @@ class AuthService:
         )
         
         self._ensure_email_not_taken(data.email)
-        try:
-            user = self._create_user(
+    
+        user = self._create_user(
                 data,
                 primary_provider=AuthProviders.LocalAuthentication,
                 last_login_provider=AuthProviders.LocalAuthentication,
                 last_login_at=datetime.now(timezone.utc)
             )
-        except Exception:
-            logger.exception(
-                "New user creation failure at signup",
-                extra={"stage":"user_creation_failure_signup"}
-            )
-            raise
 
         logger.info(
             "User created successfully",
@@ -131,35 +134,10 @@ class AuthService:
             }
         )
 
-        try:
-            access_token, refresh_token = self._issue_token(user)
-        except Exception:
-            logger.exception(
-                "Token generation failed during signup",
-                extra={
-                    "stage": "signup_token_failure",
-                    "user_id": user.id
-                }
-            )
-            raise
-
-        try:
-            self.repo.update_email_verification_sent_at(user)
-            background_tasks.add_task(
-                self.email_service.create_and_send_email_verification,
-                user
-            )
-        except Exception:
-            logger.exception(
-                "Failed to schedule email verification",
-                extra={
-                    "stage": "signup_email_schedule_failure",
-                    "user_id": user.id
-                }
-            )
-            raise
+        access_token, refresh_token = self._issue_token(user)
         
-
+        self._schedule_email_verification(background_tasks, user)
+        
         logger.info(
             "Signup successful",
             extra={
@@ -350,6 +328,15 @@ class AuthService:
                 detail="User already exists",
             )
 
+    @log_service_action("signup_email_scheduling_failure")
+    def _schedule_email_verification(self, background_tasks, user):
+        self.repo.update_email_verification_sent_at(user)
+        background_tasks.add_task(
+            self.email_service.create_and_send_email_verification,
+            user
+        )
+    
+    @log_service_action("user_creation_failure_signup")
     def _create_user(
             self,
             data: SignupSchema,
@@ -369,10 +356,18 @@ class AuthService:
         )
         return self.repo.create(**payload)
 
+    @log_service_action("signup_token_generation_failure")
     def _issue_token(self, user: User) -> str:
         refresh_token = create_refersh_token(self.db, user.id)
         access_token = create_access_token(
             subject=str(user.id))
+        
+        if not refresh_token or access_token:
+            raise TokenGenerationError(
+                message="Failed to generate token",
+                stage="signup_token_generation_failure",
+                extra={"user_id": user.id}
+            )
         return access_token, refresh_token
 
     def _ensure_user_availability_and_verify_password(self, user: User, data: LoginSchema) -> None:

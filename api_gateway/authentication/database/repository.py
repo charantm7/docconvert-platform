@@ -1,9 +1,12 @@
 import uuid
 from datetime import date, datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, exists
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
+from api_gateway.handlers.decorators import handle_db_error
+from api_gateway.handlers.exception import UserAlreadyExistsError, UserCreationError, AppError
 from api_gateway.authentication.database.models import AuthProviders, User, EmailVerificationToken, PasswordResetToken
 
 
@@ -18,30 +21,66 @@ class UserRepository:
         self.db = db
 
     # Queries
-
+    @handle_db_error(stage="get_user_by_id", message="Database error while fetching user by id")
     def get_by_id(self, user_id: uuid.UUID) -> User | None:
         return self.db.get(User, user_id)
+        
 
     def get_by_email(self, email: str) -> User | None:
-        exc = select(User).where(User.email == email)
-        return self.db.execute(exc).scalar_one_or_none()
+        try:
+            stmt = select(User).where(User.email == email)
+            return self.db.execute(stmt).scalars().first()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise AppError(
+                message="Database error while fetching user by email",
+                stage="get_user_by_email",
+                extra={"email": email[:3] + "***"}
+            )
 
     def get_by_username(self, username: str) -> User | None:
-        exc = select(User).where(User.username == username)
-        return self.db.execute(exc).scalar_one_or_none()
+        try:
+            stmt = select(User).where(User.username == username)
+            return self.db.execute(stmt).scalars().first()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise AppError(
+                message="Database error while fetching user by username",
+                stage="get_user_by_username",
+            )
 
     # Commands
 
     def create(self, **fields) -> User:
-        user = User(**fields)
-        self.db.add(user)
-        self.db.commit()
-        self.db.refresh(user)
-        return user
+        try:
+            user = User(**fields)
+            self.db.add(user)
+            self.db.commit()
+            self.db.refresh(user)
+            return user
+        except IntegrityError:
+            self.db.rollback()
+            raise UserAlreadyExistsError(
+                message="A user with this email already exists",
+                stage="user_creation",
+            )
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise UserCreationError(
+                message="Database error during user creation",
+                stage="user_creation",
+            )
 
     def exists_by_email(self, email: str) -> bool:
-        stmt = select(User.id).where(User.email == email)
-        return self.db.execute(stmt).first() is not None
+        try:
+            stmt = select(exists().where(User.email == email))
+            return self.db.execute(stmt).scalar()
+        except SQLAlchemyError:
+            self.db.rollback()
+            raise AppError(
+                message="Database error while checking email existence",
+                stage="email_existence_check",
+            )
 
     def update_last_login(
         self,
