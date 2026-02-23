@@ -3,11 +3,9 @@ from datetime import date, datetime, timezone
 
 from sqlalchemy import select, exists
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from api_gateway.handlers.decorators import handle_db_error
-from api_gateway.handlers.exception import UserAlreadyExistsError, UserCreationError, AppError
-from api_gateway.authentication.database.models import AuthProviders, User, EmailVerificationToken, PasswordResetToken
+from api_gateway.authentication.database.models import User, EmailVerificationToken, PasswordResetToken
 
 
 class UserRepository:
@@ -25,63 +23,32 @@ class UserRepository:
     def get_by_id(self, user_id: uuid.UUID) -> User | None:
         return self.db.get(User, user_id)
         
-
-    def get_by_email(self, email: str) -> User | None:
-        try:
-            stmt = select(User).where(User.email == email)
-            return self.db.execute(stmt).scalars().first()
-        except SQLAlchemyError:
-            self.db.rollback()
-            raise AppError(
-                message="Database error while fetching user by email",
-                stage="get_user_by_email",
-                extra={"email": email[:3] + "***"}
-            )
-
+    @handle_db_error(stage="get_user_by_email", message="Database error while fetching user by email")
+    def get_by_email(self, email: str) -> User | None:   
+        stmt = select(User).where(User.email == email)
+        return self.db.execute(stmt).scalars().first()
+    
+    @handle_db_error(stage="get_user_by_username", message="Database error while fetching user by username")
     def get_by_username(self, username: str) -> User | None:
-        try:
-            stmt = select(User).where(User.username == username)
-            return self.db.execute(stmt).scalars().first()
-        except SQLAlchemyError:
-            self.db.rollback()
-            raise AppError(
-                message="Database error while fetching user by username",
-                stage="get_user_by_username",
-            )
+        stmt = select(User).where(User.username == username)
+        return self.db.execute(stmt).scalars().first()
+
 
     # Commands
-
+    @handle_db_error(stage="user_creation_failure", message="Database error during user creation")
     def create(self, **fields) -> User:
-        try:
-            user = User(**fields)
-            self.db.add(user)
-            self.db.commit()
-            self.db.refresh(user)
-            return user
-        except IntegrityError:
-            self.db.rollback()
-            raise UserAlreadyExistsError(
-                message="A user with this email already exists",
-                stage="user_creation",
-            )
-        except SQLAlchemyError:
-            self.db.rollback()
-            raise UserCreationError(
-                message="Database error during user creation",
-                stage="user_creation",
-            )
-
+        user = User(**fields)
+        self.db.add(user)
+        self.db.commit()
+        self.db.refresh(user)
+        return user
+    
+    @handle_db_error(stage="email_existence_check", message="Database error while checking email existence")
     def exists_by_email(self, email: str) -> bool:
-        try:
-            stmt = select(exists().where(User.email == email))
-            return self.db.execute(stmt).scalar()
-        except SQLAlchemyError:
-            self.db.rollback()
-            raise AppError(
-                message="Database error while checking email existence",
-                stage="email_existence_check",
-            )
-
+        stmt = select(exists().where(User.email == email))
+        return self.db.execute(stmt).scalar()
+        
+    @handle_db_error(stage="update_last_login", message="Failed to update last login")
     def update_last_login(
         self,
         provider: str,
@@ -91,28 +58,34 @@ class UserRepository:
         user.last_login_provider = provider
         self.db.commit()
 
+    @handle_db_error(stage="update_email_verification_status", message="Failed to update email verification status")
     def update_email_verification_status(self, user_id: uuid.UUID) -> None:
         user = self.get_by_id(user_id)
         user.is_email_verified = True
         self.db.commit()
 
+    @handle_db_error(stage="update_email_verification_sent_at", message="Failed to update email verification sent at")
     def update_email_verification_sent_at(self, user: User) -> None:
         user.email_verification_sent_at = datetime.now(timezone.utc)
         self.db.commit()
-
+    
+    @handle_db_error(stage="update_email_verified_at", message="Failed to update email verified at")
     def update_email_verified_at(self, user_id: uuid.UUID) -> None:
         user = self.get_by_id(user_id)
         user.email_verified_at = datetime.now(timezone.utc)
         self.db.commit()
 
+    @handle_db_error(stage="update_password", message="Failed to update password")
     def update_password(self, user: User, hashed_password: str) -> None:
         user.hashed_password = hashed_password
         self.db.commit()
 
+    @handle_db_error(stage="update_password_reset_link_sent_at", message="Failed to update the password link sent at ")
     def update_password_reset_link_sent_at(self, user: User) -> None:
         user.password_reset_sent_at = datetime.now(timezone.utc)
         self.db.commit()
 
+    @handle_db_error(stage="update_password_reseted_at", message="Failed to update the password reseted at")
     def update_password_reseted_at(self, user: User) -> None:
         user.password_reseted_at = datetime.now(timezone.utc)
         self.db.commit()

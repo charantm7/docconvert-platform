@@ -2,7 +2,7 @@ import functools
 import logging
 import asyncio
 
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError
 
 from api_gateway.handlers.exception import AppError
 
