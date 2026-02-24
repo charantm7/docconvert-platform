@@ -21,6 +21,7 @@ def require_auth(request: Request):
             status_code=status.HTTP_401_UNAUTHORIZED,
             content={"detail": "Invalid or expired token"},
         )
+    # 
 
     request.state.user_id = payload.get("sub")
     request.state.type = payload.get("type")
