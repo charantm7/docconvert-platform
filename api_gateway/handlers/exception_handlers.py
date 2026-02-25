@@ -3,7 +3,7 @@
 import logging
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
-from exception import UserAlreadyExistsError, AppError, TokenGenerationError, EmailSchedulingError, UserCreationError
+from api_gateway.handlers.exception import UserAlreadyExistsError, AppError, TokenGenerationError, EmailSchedulingError, UserCreationError
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ def register_exception_handlers(app):
             }
         )
         return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": exc.message})
-    
+   
     @app.exception_handler(EmailSchedulingError)
     async def email_scheduling_handler(request: Request, exc: EmailSchedulingError):
         logger.warning(

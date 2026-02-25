@@ -114,3 +114,8 @@ async def twitter_login(request: Request):
 @auth.get("/twitter/callback", response_model=TokenResponse,  tags=["public"])
 async def twitter_callback(request: Request, db: Session = Depends(get_db)):
     return await OauthService(db).twitter_callback_service(request)
+
+
+@auth.get("/getby")
+async def get_by(db: Session = Depends(get_db)):
+    return UserRepository(db).get_by_email("charantm8787@gmail.com")
