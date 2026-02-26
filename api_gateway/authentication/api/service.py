@@ -73,6 +73,7 @@ def get_current_user(
 
 class TokenService:
 
+    @log_service_action("token_generation")
     @staticmethod
     def generate_tokens(user_id: uuid.UUID,  db) -> dict:
         access_token = create_access_token(str(user_id))
@@ -465,6 +466,7 @@ class OauthService:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
         user = await self.github_auth_client.fetch_github_userinfo(token)
+        print(user)
 
         return self._handle_github_users(user)
 
@@ -492,6 +494,7 @@ class OauthService:
 
     # Internal handlers
 
+    @log_service_action("oauth_handle_google_user")
     def _handle_google_user(self, user_info: dict) -> dict:
         user_id = user_info.get("id")
         email = user_info.get('email')
@@ -541,6 +544,7 @@ class OauthService:
         )
         return TokenService.generate_tokens(user_id=user.id, db=self.db)
 
+    @log_service_action("handle_github_users")
     def _handle_github_users(self, user_info: dict):
         email = user_info['email']
 
@@ -589,6 +593,7 @@ class OauthService:
         )
         return TokenService.generate_tokens(user_id=user.id, db=self.db)
 
+    @log_service_action("handle_twitter_user")
     def _handle_twitter_user(self, user_info: dict) -> dict:
         username = user_info['data']['username']
 
@@ -718,8 +723,8 @@ class EmailService:
 
         self.user_repo.update_email_verification_sent_at(user)
 
-        return "Email sent successfully"
-        # Internal helpers
+        return {"message":"Email sent successfully"}
 
+        # Internal helpers
     def _issue_hashed_token(self, token: str) -> str:
         return hash_token(token)

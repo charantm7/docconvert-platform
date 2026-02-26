@@ -10,8 +10,8 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordBearer
 
-from api_gateway.authentication.database.repository import UserRepository
 from api_gateway.settings import settings
+from api_gateway.handlers.decorators import log_service_action
 from api_gateway.authentication.database.models import RefreshToken
 
 
@@ -50,7 +50,7 @@ def verify_password_hash(password: str, hashed: str):
             detail=str(e)
         )
 
-
+@log_service_action("hash_token")
 def hash_token(data: str):
     return hashlib.sha256(data.encode()).hexdigest()
 
@@ -95,11 +95,11 @@ def create_refersh_token(db: Session, user_id):
 
     return refresh_token
 
-
+@log_service_action("create_email_verification_token")
 def create_email_verification_token() -> str:
     return secrets.token_urlsafe(32)
 
-
+@log_service_action("create_password_reset_token")
 def create_password_reset_token() -> str:
     return secrets.token_urlsafe(32)
 

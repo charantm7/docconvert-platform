@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Response, status
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from common_logging.configuration import setup_logging
 from api_gateway.middleware.request_id_middleware import RequestIdMiddleware
@@ -45,6 +46,7 @@ register_exception_handlers(app)
 app.include_router(upload_proxy.upload)
 app.include_router(auth)
 
+Instrumentator().instrument(app).expose(app)
 
 @app.get("/favicon.ico")
 def favicon_point():
