@@ -69,6 +69,12 @@ def handle_db_error(stage: str, message: str):
                 return func(*args, **kwargs)
             except AppError:
                 raise
+            except Exception as e:
+                args[0].db.rollback()
+                raise AppError(
+                    message=message,
+                    stage=stage,
+                ) from e
             except SQLAlchemyError as e:
                 args[0].db.rollback()
                 raise AppError(

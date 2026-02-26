@@ -3,6 +3,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
+from api_gateway.handlers.exception import AppError
+
 from api_gateway.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -29,18 +31,21 @@ def get_db():
         yield db
     
     except SQLAlchemyError:
+        db.rollback()
         logger.exception(
             "Database session error occurred",
             extra={"stage":"database_session_error"}
         )
-        db.rollback()
         raise
+    except AppError:
+        raise 
+    
     except Exception:
+        db.rollback()
         logger.exception(
             "Unexpected error during DB session",
             extra={"stage":"db_unexpected_error"}
         )
-        db.rollback()
         raise
 
     finally:
