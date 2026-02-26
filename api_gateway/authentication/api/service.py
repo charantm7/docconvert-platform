@@ -159,18 +159,9 @@ class AuthService:
         )
 
         user = self.repo.get_by_email(data.email)
-        try:
-            self._ensure_user_availability_and_verify_password(
-            user=user, data=data)
-        except HTTPException:
-            logger.exception(
-                "Login Failed due to credentials",
-                extra={
-                    "stage": "login_failed_on_credential",
-                    "email": data.email
-                }
-            )
-            raise
+        
+        self._ensure_user_availability_and_verify_password(user=user, data=data)
+        
         self.repo.update_last_login(
             provider=AuthProviders.LocalAuthentication,
             user=user
@@ -183,7 +174,9 @@ class AuthService:
                 "user_id": user.id
             }
         )
+
         access_token, refresh_token = self._issue_token(user)
+        
         return {'access_token': access_token, "refresh_token": refresh_token}
 
     def create_and_send_password_reset_link(self, email: str):
@@ -219,6 +212,7 @@ class AuthService:
                     "user_id": user.id
                 }
             )
+
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Please wait before requesting another Password reset link",
@@ -227,33 +221,15 @@ class AuthService:
         token = create_password_reset_token()
         hashed_token = hash_token(token)
 
-        try:
-            self._create_password_reset_record(user, hashed_token)
-        except Exception:
-            logger.exception(
-                "Failed to create password reset record on db",
-                extra={
-                    "stage": "failed_to_create_password_reset_record_on_db",
-                    "email": email[:3] + "****"
-                }
-            )
-            raise
         
+        self._create_password_reset_record(user, hashed_token)
+       
         reset_link = (
             f"{settings.REDIRECT_URL}/reset-password?token={token}"
         )
-        try:
-            send_password_reset_link(reset_link, email)
-        except Exception:
-            logger.exception(
-                "Failed to send password reset email",
-                extra={
-                    "stage": "password_reset_email_failure",
-                    "user_id": user.id
-                }
-            )
-            raise
-        
+       
+        send_password_reset_link(reset_link, email)
+      
         self.repo.update_password_reset_link_sent_at(user)
 
         logger.info(
@@ -265,6 +241,7 @@ class AuthService:
         )
         return f"Reset Link sent to {email} successfully"
 
+    @log_service_action("reset_password_from_token")
     def reset_password_from_token(
         self,
         token: str,
@@ -370,13 +347,15 @@ class AuthService:
             )
         return access_token, refresh_token
 
+    @log_service_action("ensure_user_availability_and_verify_password")
     def _ensure_user_availability_and_verify_password(self, user: User, data: LoginSchema) -> None:
         if not user or not verify_password_hash(data.password, user.hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid Credentials"
             )
-
+    
+    @log_service_action("create_password_reset_record")
     def _create_password_reset_record(self, user: User, hashed_token: str):
         self.repo.create_password_reset_record(
                 hashed_token=hashed_token,
@@ -384,6 +363,7 @@ class AuthService:
                 expires_at=(datetime.now(
                     timezone.utc) + timedelta(minutes=settings.PASSWORD_RESET_TOKEN_EXPIRE_MINUTE))
             )
+
 
 class OauthService:
 

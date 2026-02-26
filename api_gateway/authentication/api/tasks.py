@@ -3,9 +3,10 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 from api_gateway.authentication.api.security import render_email_template
+from api_gateway.handlers.decorators import log_service_action
 from api_gateway.settings import settings
 
-
+@log_service_action("send_email_verification_link")
 def send_email_verification_link(link: str, to_email: str) -> None:
     subject = "Verify Your DocPipe Account"
 
@@ -31,7 +32,7 @@ def send_email_verification_link(link: str, to_email: str) -> None:
     except Exception as e:
         print("Exception", str(e))
 
-
+@log_service_action("send_password_reset_link")
 def send_password_reset_link(link: str, to_email: str) -> None:
     subject = "Reset Your DocConvert Password"
 

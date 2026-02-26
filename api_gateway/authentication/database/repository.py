@@ -25,7 +25,7 @@ class UserRepository:
         
     @handle_db_error(stage="get_user_by_email", message="Database error while fetching user by email")
     def get_by_email(self, email: str) -> User | None:   
-        stmt = select(User).where(User.emai == email)
+        stmt = select(User).where(User.email == email)
         return self.db.execute(stmt).scalars().first()
     
     @handle_db_error(stage="get_user_by_username", message="Database error while fetching user by username")
@@ -91,17 +91,19 @@ class UserRepository:
         self.db.commit()
 
     # Password Token record
-
+    @handle_db_error(stage="create_password_reset_record", message="Failed to create password reset record")
     def create_password_reset_record(self, **fields) -> None:
         record = PasswordResetToken(**fields)
         self.db.add(record)
         self.db.commit()
 
+    @handle_db_error(stage="existence_for_password_reset_token", message="Failed to check the existence of password reset token")
     def is_password_reset_token_exists(self, token: str) -> PasswordResetToken:
         stmt = select(PasswordResetToken).where(
             PasswordResetToken.hashed_token == token)
         return self.db.execute(stmt).scalar_one_or_none()
 
+    @handle_db_error(stage="update_password_reset_token_status", message="Failed to update the password reset token status")
     def update_password_reset_token_status(self, token_record: PasswordResetToken) -> None:
         token_record.used = True
         self.db.commit()
@@ -111,16 +113,18 @@ class EmailRepository:
     def __init__(self, db: Session):
         self.db = db
 
+    @handle_db_error(stage="create_email_verification_token_record", message="Failed to create the email verification token record")
     def create(self, **fields) -> None:
         token = EmailVerificationToken(**fields)
         self.db.add(token)
         self.db.commit()
-
+    @handle_db_error(stage="is_email_verification_token_exists", message="Failed at to check the email verification token exists")
     def is_token_exists(self, hashed_token: str) -> EmailVerificationToken:
         stmt = select(EmailVerificationToken).where(
             EmailVerificationToken.hashed_token == hashed_token)
         return self.db.execute(stmt).scalar_one_or_none()
 
+    @handle_db_error(stage="update_email_verification_token_status", message="Failed to update email verification token record")
     def update_token_record_status(self, record: EmailVerificationToken) -> None:
         record.used = True
         self.db.commit()
