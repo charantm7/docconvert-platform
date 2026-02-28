@@ -16,3 +16,7 @@ jwt
 zxcvbn
 supabase
 python-multipart
+prometheus_fastapi_instrumentator
+prometheus_client
+python-json-logger
+psycopg2-binary
