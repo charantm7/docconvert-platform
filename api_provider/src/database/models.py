@@ -5,8 +5,7 @@ from uuid import uuid4
 from sqlalchemy import Column, ForeignKey, String, Boolean, Date, Enum, DateTime
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, CITEXT
 from sqlalchemy.sql import func
-
-from api_gateway.authentication.database.connection import Base
+from api_provider.src.database.connection import Base
 
 
 class AuthProviders(str, enum.Enum):
@@ -99,51 +98,23 @@ class User(TimestampMixin, Base):
     )
 
 
-class RefreshToken(Base):
-    __tablename__ = 'refresh_token'
+class APIKey(TimestampMixin, Base):
+    __tablename__ = "api_key"
 
-    id = Column(
-        PG_UUID(as_uuid=True),
-        primary_key=True,
-        unique=True,
-        nullable=False,
-        default=uuid4
-    )
-    hashed_refresh_token = Column(String, nullable=False)
-    expire_at = Column(DateTime(timezone=True), nullable=False)
-    created_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False
-    )
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
 
-    is_revoked = Column(Boolean, default=False)
+    hashed_key = Column(String(128), nullable=False, unique=True)
+
+    prefix = Column(String(12), nullable=False, index=True)
 
     user_id = Column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete='CASCADE')
+        PG_UUID(as_uuid=True), 
+        ForeignKey("user.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
     )
+    expiring_at = Column(DateTime(timezone=True), nullable=False)
+    
+    name = Column(String(100), nullable=True)  
 
-
-class EmailVerificationToken(Base):
-    __tablename__ = "email_verification_tokens"
-
-    id = Column(PG_UUID(as_uuid=True), primary_key=True,
-                unique=True, nullable=False, default=uuid4)
-    hashed_token = Column(String, nullable=False, index=True, unique=True)
-    user_id = Column(PG_UUID(as_uuid=True), ForeignKey(
-        "users.id", ondelete="CASCADE"))
-    expires_at = Column(DateTime(timezone=True), nullable=False)
-    used = Column(Boolean, default=False)
-
-
-class PasswordResetToken(Base):
-    __tablename__ = "password_reset_tokens"
-
-    id = Column(PG_UUID(as_uuid=True), primary_key=True,
-                unique=True, nullable=False, default=uuid4)
-    hashed_token = Column(String, nullable=False, index=True, unique=True)
-    user_id = Column(PG_UUID(as_uuid=True), ForeignKey(
-        "users.id", ondelete="CASCADE"))
-    expires_at = Column(DateTime(timezone=True), nullable=False)
-    used = Column(Boolean, default=False)
+    is_active = Column(Boolean, default=True, nullable=False)

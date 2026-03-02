@@ -1,8 +1,8 @@
-"""initial migration for local db
+"""initial migration for docker
 
-Revision ID: fc4d0ca256c7
+Revision ID: 78d291e768d8
 Revises: 
-Create Date: 2026-02-26 00:04:20.370218
+Create Date: 2026-03-02 13:22:39.795034
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = 'fc4d0ca256c7'
+revision: str = '78d291e768d8'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

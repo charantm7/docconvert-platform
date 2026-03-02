@@ -5,9 +5,9 @@ from sqlalchemy.orm import Session
 from api_gateway.authentication.api import security
 from api_gateway.authentication.api.service import AuthService, EmailService, OauthService, get_current_user
 from api_gateway.authentication.config import Oauth2
-from api_gateway.authentication.database.connection import get_db
-from api_gateway.authentication.database.models import User, AuthProviders
-from api_gateway.authentication.database.repository import UserRepository
+from shared_database.connection import get_db
+from shared_database.models import User, AuthProviders
+from shared_database.repository import UserRepository
 from api_gateway.authentication.api.schema import SignupSchema, LoginSchema, TokenResponse, PasswordResetRequestSchema, PasswordResetSchema
 
 auth = APIRouter(tags=["public"])

@@ -5,7 +5,7 @@ from sqlalchemy import select, exists
 from sqlalchemy.orm import Session
 
 from api_gateway.handlers.decorators import handle_db_error
-from api_gateway.authentication.database.models import User, EmailVerificationToken, PasswordResetToken
+from shared_database.models import User, EmailVerificationToken, PasswordResetToken
 
 
 class UserRepository:

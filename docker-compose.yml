@@ -16,6 +16,23 @@ services:
     depends_on:
       - db
 
+  api-provider:
+    build:
+      context: .
+      dockerfile: api_provider/Dockerfile
+
+    container_name: api-provider
+    volumes:
+      - .:/app
+
+    ports:
+      - "8002:8002"
+    networks:
+      - observability
+
+    depends_on:
+      - db
+
   db:
     image: postgres:15
     environment:

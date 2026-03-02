@@ -28,12 +28,12 @@ from api_gateway.handlers.exception import (
 from api_gateway.settings import settings
 from api_gateway.authentication.config import Oauth2
 from api_gateway.handlers.decorators import log_service_action
-from api_gateway.authentication.database.connection import get_db
-from api_gateway.authentication.database.models import AuthProviders, User
+from shared_database.connection import get_db
+from shared_database.models import AuthProviders, User
 from api_gateway.authentication.config.github_client import GithubOAuthClient
 from api_gateway.authentication.config.google_client import GoogleOAuthClient
 from api_gateway.authentication.config.twitter_client import TwitterOAuthClient
-from api_gateway.authentication.database.repository import EmailRepository, UserRepository
+from shared_database.repository import EmailRepository, UserRepository
 from api_gateway.authentication.api.tasks import send_email_verification_link, send_password_reset_link
 from api_gateway.authentication.api.schema import SignupSchema, LoginSchema, PasswordResetSchema, TokenResponse
 

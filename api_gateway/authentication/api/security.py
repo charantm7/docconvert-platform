@@ -12,7 +12,7 @@ from fastapi.security import OAuth2PasswordBearer
 
 from api_gateway.settings import settings
 from api_gateway.handlers.decorators import log_service_action
-from api_gateway.authentication.database.models import RefreshToken
+from shared_database.models import RefreshToken
 
 
 hashing_context = CryptContext(
