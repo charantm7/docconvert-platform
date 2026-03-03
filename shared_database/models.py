@@ -125,6 +125,28 @@ class RefreshToken(Base):
     )
 
 
+class APIKey(TimestampMixin, Base):
+    __tablename__ = "api_key"
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+
+    hashed_key = Column(String(128), nullable=False, unique=True)
+
+    prefix = Column(String(12), nullable=False, index=True)
+
+    user_id = Column(
+        PG_UUID(as_uuid=True), 
+        ForeignKey("user.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    expiring_at = Column(DateTime(timezone=True), nullable=False)
+    
+    name = Column(String(100), nullable=True)  
+
+    is_active = Column(Boolean, default=True, nullable=False)
+
+
 class EmailVerificationToken(Base):
     __tablename__ = "email_verification_tokens"
 
