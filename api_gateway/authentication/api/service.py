@@ -106,7 +106,7 @@ class AuthService:
     def __init__(self, db):
         self.db = db
         self.repo = UserRepository(db)
-        self.email_service = EmailService(db)
+        self.email_service = EmailService()
 
     def signup(self, data: SignupSchema, background_tasks: BackgroundTasks) -> dict:
 

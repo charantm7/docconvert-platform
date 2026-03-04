@@ -136,7 +136,7 @@ class APIKey(TimestampMixin, Base):
 
     user_id = Column(
         PG_UUID(as_uuid=True), 
-        ForeignKey("user.id", ondelete="CASCADE"),
+        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True
     )

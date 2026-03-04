@@ -5,7 +5,7 @@ from sqlalchemy import select, exists
 from sqlalchemy.orm import Session
 
 from api_gateway.handlers.decorators import handle_db_error
-from shared_database.models import User, EmailVerificationToken, PasswordResetToken
+from shared_database.models import User, EmailVerificationToken, PasswordResetToken, APIKey
 
 
 class UserRepository:
@@ -128,3 +128,23 @@ class EmailRepository:
     def update_token_record_status(self, record: EmailVerificationToken) -> None:
         record.used = True
         self.db.commit()
+
+
+class APIKeyService:
+    
+    def __int__(self, db: Session):
+        self.db = db
+
+
+    def get_by_key(self, hashed_key: str) -> APIKey | None:
+        stmt = select(APIKey).where(APIKey.hashed_key == hashed_key)
+        return self.db.execute(stmt).scalar_one()
+
+
+
+    def create(self, **field) -> APIKey:
+        new_key = APIKey(**field)
+        self.db.add(new_key)
+        self.db.commit()
+        self.db.refresh(new_key)
+        return new_key

@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     DB_PORT: int
     POSTGRES_URL: str
 
+    API_KEY_PREFIX: str
+
     ACCESS_TOKEN_EXPIRE_MINUTE: int
     JWT_ALGORITHM: str
     JWT_SECRETE: str
