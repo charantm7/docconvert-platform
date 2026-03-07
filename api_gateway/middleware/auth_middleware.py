@@ -4,19 +4,27 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from api_gateway.authentication.api.security import validate_jwt_token
 from api_gateway.settings import settings
-from shared_database.repository import APIKeyService
+from shared_database.repository import APIKeyService, UserRepository
 import hashlib
 
 from fastapi.security.utils import get_authorization_scheme_param
 from sqlalchemy.orm import Session
+
+class AuthUser:
+
+    def __init__(self, user_id:str, auth_type: str):
+        self.user_id = user_id
+        self.auth_type = auth_type
+        
 
 class VerificationService:
 
     def __init__(self, db: Session):
         self.db = db
         self.api_repo = APIKeyService(db)
+        self.user_repo = UserRepository(db)
      
-    async def _verify_api_key(self, token: str):
+    async def _verify_api_key(self, token: str) -> AuthUser:
         
 
         hashed_token = self._hash_token(token)
@@ -31,9 +39,9 @@ class VerificationService:
         if not key_record.is_active:
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "API key has been revoked")
         
-        return key_record.user_id
+        return AuthUser(user_id=key_record.user_id, auth_type="api_key")
     
-    def require_auth(self, token:str) -> str:
+    def _verify_jwt_token(self, token:str) -> AuthUser:
 
         try:
             payload = validate_jwt_token(token)
@@ -43,18 +51,19 @@ class VerificationService:
                 content={"detail": "Invalid jwt or expired token"},
             )
 
-        request.state.user_id = payload.get("sub")
-        request.state.type = payload.get("type")
+        user_id = payload.get("sub")
+        user = self.user_repo.get_by_id(user_id=user_id)
 
+        if not user.is_active:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "User not exists or not active")
+        
+        return AuthUser(
+            user_id=user.id,
+            auth_type="jwt"
+        )
 
     def _hash_token(self, data: str) -> str:
         return hashlib.sha256(data.encode()).hexdigest()
-
-
-
-
-
-
 
 
 class DualAuthMiddleware:
@@ -79,8 +88,10 @@ class DualAuthMiddleware:
             return
         
         try:
-            request.state.user = 
+            request.state.user = self._resolve()
 
+            pass
+        except:
             pass
 
     async def _resolve(self,request: Request):
@@ -97,7 +108,7 @@ class DualAuthMiddleware:
         if token.startswith(settings.API_KEY_PREFIX):
             return VerificationService(self.db)._verify_api_key(token)
         else:
-            return 
+            return VerificationService(self.db)._verify_jwt_token(token)
 
         
 
