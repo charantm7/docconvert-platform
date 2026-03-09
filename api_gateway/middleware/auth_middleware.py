@@ -28,7 +28,7 @@ class VerificationService:
         self.api_repo = APIKeyService(db)
         self.user_repo = UserRepository(db)
      
-    async def verify_api_key(self, token: str) -> AuthUser:
+    def verify_api_key(self, token: str) -> AuthUser:
         
 
         hashed_token = self._hash_token(token)
@@ -43,7 +43,9 @@ class VerificationService:
         if not key_record.is_active:
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "API key has been revoked")
         
-        return AuthUser(user_id=key_record.user_id, auth_type="api_key")
+        print(key_record)
+        
+        return AuthUser(user_id=str(key_record.user_id), auth_type="api_key")
     
     def verify_jwt_token(self, token:str) -> AuthUser:
 
@@ -62,7 +64,7 @@ class VerificationService:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "User not exists or not active")
         
         return AuthUser(
-            user_id=user.id,
+            user_id=str(user.id),
             auth_type="jwt"
         )
 
@@ -72,7 +74,21 @@ class VerificationService:
 
 class DualAuthMiddleware:
 
-    PUBLIC_PATHS = {"/", "/docs", "/redoc", "/openapi.json", "/health"}
+    PUBLIC_PATHS = {"/", 
+                    "/docs", 
+                    "/redoc", 
+                    "/openapi.json", 
+                    "/favicon.ico",
+                    "/health", 
+                    "/metrics",
+                    "/google/login",
+                    "/login",
+                    "/signup",
+                    "/verify-password",
+                    "/github/login",
+                    "/google/callback",
+                    "/github/callback"
+                }
 
     def __init__(self, app):
         self.app = app
@@ -130,7 +146,6 @@ class DualAuthMiddleware:
             
 
         
-
 def get_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
@@ -153,7 +168,7 @@ def get_current_user(
     token = credentials.credentials
 
     if token.startswith(settings.API_KEY_PREFIX):
-        request.state.user =  VerificationService(db).verify_api_key(token)
+        request.state.user = VerificationService(db).verify_api_key(token)
     else:
         request.state.user = VerificationService(db).verify_jwt_token(token)
 

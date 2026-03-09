@@ -672,7 +672,9 @@ class EmailService:
 
         return {"message": "Email Verification Successful"}
 
-    def resend_verification_link(self, user: User, backround_task: BackgroundTasks) -> str:
+    def resend_verification_link(self, user_id: str, backround_task: BackgroundTasks) -> str:
+
+        user = self.user_repo.get_by_id(user_id)
         if user.is_email_verified:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

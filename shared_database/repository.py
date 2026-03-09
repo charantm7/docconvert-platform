@@ -26,12 +26,12 @@ class UserRepository:
     @handle_db_error(stage="get_user_by_email", message="Database error while fetching user by email")
     def get_by_email(self, email: str) -> User | None:   
         stmt = select(User).where(User.email == email)
-        return self.db.execute(stmt).scalars().first()
+        return self.db.execute(stmt).scalar_one_or_none()
     
     @handle_db_error(stage="get_user_by_username", message="Database error while fetching user by username")
     def get_by_username(self, username: str) -> User | None:
         stmt = select(User).where(User.username == username)
-        return self.db.execute(stmt).scalars().first()
+        return self.db.execute(stmt).scalar_one_or_none()
 
 
     # Commands
@@ -132,13 +132,13 @@ class EmailRepository:
 
 class APIKeyService:
     
-    def __int__(self, db: Session):
+    def __init__(self, db: Session):
         self.db = db
 
 
     def get_by_key(self, hashed_key: str) -> APIKey | None:
         stmt = select(APIKey).where(APIKey.hashed_key == hashed_key)
-        return self.db.execute(stmt).scalar_one()
+        return self.db.execute(stmt).scalar_one_or_none()
 
 
 

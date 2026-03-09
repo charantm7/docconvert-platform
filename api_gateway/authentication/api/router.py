@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Request, status, BackgroundTasks, HTTPEx
 from sqlalchemy.orm import Session
 
 from api_gateway.authentication.api import security
-from api_gateway.authentication.api.service import AuthService, EmailService, OauthService, get_current_user
+from api_gateway.authentication.api.service import AuthService, EmailService, OauthService
 from api_gateway.authentication.config import Oauth2
 from shared_database.connection import get_db
 from shared_database.models import User, AuthProviders
@@ -60,11 +60,11 @@ async def verify_email(
 )
 async def resend_email_verification(
     background_task: BackgroundTasks,
-    current_user: User = Depends(get_current_user),
+    request: Request,
     db: Session = Depends(get_db)
 ):
     return EmailService(db).resend_verification_link(
-        user=current_user,
+        user_id=request.state.user.user_id,
         backround_task=background_task
     )
 
