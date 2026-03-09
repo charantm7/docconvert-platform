@@ -3,7 +3,7 @@ import uuid
 import logging
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
-from fastapi import HTTPException, status, BackgroundTasks, Depends
+from fastapi import HTTPException, status, BackgroundTasks, Depends, Request
 
 from api_gateway.authentication.api.security import (
     create_access_token,
@@ -43,32 +43,6 @@ VERIFICATION_RESEND_COOLDOWN = timedelta(minutes=5)
 PASSWORD_VERIFICATION_RESEND_COOLDOWN = timedelta(minutes=1)
 
 
-def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
-) -> User:
-    payload = validate_jwt_token(token)
-
-    try:
-        user_id = uuid.UUID(payload["sub"])
-    except (KeyError, ValueError):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token payload",
-        )
-    user = UserRepository(db).get_by_id(user_id)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-        )
-
-    if getattr(user, "is_active", True) is False:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is inactive",
-        )
-    return user
 
 
 class TokenService:

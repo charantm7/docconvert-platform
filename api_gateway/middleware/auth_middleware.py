@@ -1,14 +1,18 @@
+import hashlib
+from uuid import uuid4, UUID
 from datetime import datetime, timezone
-from fastapi import Request, HTTPException, status
+from fastapi import Request, HTTPException, status, Depends
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from api_gateway.authentication.api.security import validate_jwt_token
 from api_gateway.settings import settings
 from shared_database.repository import APIKeyService, UserRepository
-import hashlib
+from shared_database.connection import SessionLocal, get_db
 
 from fastapi.security.utils import get_authorization_scheme_param
 from sqlalchemy.orm import Session
+
+security = HTTPBearer(auto_error=False)
 
 class AuthUser:
 
@@ -24,7 +28,7 @@ class VerificationService:
         self.api_repo = APIKeyService(db)
         self.user_repo = UserRepository(db)
      
-    async def _verify_api_key(self, token: str) -> AuthUser:
+    async def verify_api_key(self, token: str) -> AuthUser:
         
 
         hashed_token = self._hash_token(token)
@@ -41,7 +45,7 @@ class VerificationService:
         
         return AuthUser(user_id=key_record.user_id, auth_type="api_key")
     
-    def _verify_jwt_token(self, token:str) -> AuthUser:
+    def verify_jwt_token(self, token:str) -> AuthUser:
 
         try:
             payload = validate_jwt_token(token)
@@ -70,9 +74,8 @@ class DualAuthMiddleware:
 
     PUBLIC_PATHS = {"/", "/docs", "/redoc", "/openapi.json", "/health"}
 
-    def __init__(self, app, db: Session):
+    def __init__(self, app):
         self.app = app
-        self.db = db
 
 
     async def __call__(self, scope, receive, send):
@@ -87,12 +90,13 @@ class DualAuthMiddleware:
             await self.app(scope, receive, send)
             return
         
-        try:
-            request.state.user = self._resolve()
-
-            pass
-        except:
-            pass
+        response = await self._resolve(request)
+        
+        if response:
+            await response(scope, receive, send)
+            return
+        
+        await self.app(scope, receive, send)
 
     async def _resolve(self,request: Request):
         raw = request.headers.get("Authorization", "")
@@ -104,13 +108,56 @@ class DualAuthMiddleware:
                 "Authorization header missing or malformed. Expected: Bearer <token>",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        
-        if token.startswith(settings.API_KEY_PREFIX):
-            return VerificationService(self.db)._verify_api_key(token)
-        else:
-            return VerificationService(self.db)._verify_jwt_token(token)
+        db = SessionLocal()
+
+        try:
+            service = VerificationService(db)
+            if token.startswith(settings.API_KEY_PREFIX):
+                request.state.user = service.verify_api_key(token)
+            else:
+                request.state.user = service.verify_jwt_token(token)
+
+            return None
+
+        except HTTPException as e:
+            return JSONResponse(
+                status_code=e.status_code,
+                content={"detail": e.detail}
+            )
+
+        finally:
+            db.close()
+            
 
         
+
+def get_current_user(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+) -> AuthUser:
+    
+    user = getattr(request.state, 'user', None)
+
+    if user:
+        return user
+    
+    if not credentials:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            "Authorization header missing",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    
+    token = credentials.credentials
+
+    if token.startswith(settings.API_KEY_PREFIX):
+        request.state.user =  VerificationService(db).verify_api_key(token)
+    else:
+        request.state.user = VerificationService(db).verify_jwt_token(token)
+
+
 
         
 

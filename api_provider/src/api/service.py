@@ -9,6 +9,7 @@ from shared_database.repository import APIKeyService
 
 
 logger = logging.getLogger(__name__)
+API_KEY_PREFIX = 'sk-'
 
 class APIService:
 
@@ -19,11 +20,11 @@ class APIService:
 
     def create_new_token(self, name:str, expire_at: DateTime = datetime.now(timezone.utc) + timedelta(days=30) )-> str:
 
-        token = self._token_generator()
+        token = API_KEY_PREFIX + self._token_generator()
 
         hashed_token = self._hash_token(token)
 
-        key_record = self.api_repo.create(
+        self.api_repo.create(
             hashed_key=hashed_token,
             prefix=hashed_token[:10],
             name=name,

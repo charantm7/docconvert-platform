@@ -5,11 +5,13 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from common_logging.configuration import setup_logging
 from api_gateway.middleware.request_id_middleware import RequestIdMiddleware
+from api_gateway.middleware.auth_middleware import DualAuthMiddleware
 from api_gateway.settings import settings
 
 from .authentication.api.router import auth
 from .routes import (
-    upload_proxy
+    upload_proxy,
+    api_provider_proxy
 )
 from api_gateway.handlers.exception_handlers import register_exception_handlers
 
@@ -41,9 +43,11 @@ app.add_middleware(
 )
 # app.add_middleware(AuthMiddleware)
 app.add_middleware(RequestIdMiddleware)
+app.add_middleware(DualAuthMiddleware)
 register_exception_handlers(app)
 
 app.include_router(upload_proxy.upload)
+app.include_router(api_provider_proxy.api_provider)
 app.include_router(auth)
 
 Instrumentator().instrument(app).expose(app)

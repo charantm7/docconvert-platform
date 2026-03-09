@@ -8,6 +8,8 @@ class Settings(BaseSettings):
 
     UPLOAD_SERVICE_URL: str
     DOWNLOAD_SERVICE_URL: str
+    API_PROVIDER_SERVICE_URL: str
+
 
     # Database
     DB_NAME: str

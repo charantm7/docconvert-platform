@@ -1,11 +1,11 @@
 
 import httpx
 from fastapi import APIRouter, Request, Response, Depends
-from api_gateway.middleware.auth_middleware import require_auth
+from api_gateway.middleware.auth_middleware import get_current_user
 
 from ..settings import settings
 
-upload = APIRouter(dependencies=[Depends(require_auth)])
+upload = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 @upload.post("/upload/presigned")
@@ -21,7 +21,7 @@ async def proxy_presigned_generation_upload(request: Request):
             "transfer-encoding",
         }
     }
-    forward_header["User-Id"] = request.state.user_id
+    forward_header["User-Id"] = request.state.user.user_id
     forward_header["Request-Id"] = request.state.request_id
 
     json_body = await request.json()
@@ -62,7 +62,7 @@ async def proxy_presigned_generation_upload(path: str, request: Request):
             "transfer-encoding",
         }
     }
-    forward_header["User-Id"] = request.state.user_id
+    forward_header["User-Id"] = request.state.user.user_id
     forward_header["Request-Id"] = request.state.request_id
 
     json_body = await request.json()
