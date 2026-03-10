@@ -1,5 +1,6 @@
 import hashlib
 from uuid import uuid4, UUID
+from typing import List
 from datetime import datetime, timezone
 from fastapi import Request, HTTPException, status, Depends
 from fastapi.responses import JSONResponse
@@ -16,9 +17,11 @@ security = HTTPBearer(auto_error=False)
 
 class AuthUser:
 
-    def __init__(self, user_id:str, auth_type: str):
+    def __init__(self, user_id:str, auth_type: str, scopes: List[str] = []):
         self.user_id = user_id
         self.auth_type = auth_type
+        self.scopes = scopes
+
         
 
 class VerificationService:
@@ -89,6 +92,8 @@ class DualAuthMiddleware:
                     "/google/callback",
                     "/github/callback"
                 }
+    
+    
 
     def __init__(self, app):
         self.app = app
@@ -172,6 +177,10 @@ def get_current_user(
     else:
         request.state.user = VerificationService(db).verify_jwt_token(token)
 
+
+def require_scopes(scope: str):
+    async def _guard(user: AuthUser = Depends(get_current_user)):
+        if scope not in user.scope
 
 
         

@@ -2,7 +2,7 @@ import enum
 
 import sqlalchemy
 from uuid import uuid4
-from sqlalchemy import Column, ForeignKey, String, Boolean, Date, Enum, DateTime
+from sqlalchemy import Column, ForeignKey, String, Boolean, Date, Enum, DateTime, ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, CITEXT
 from sqlalchemy.sql import func
 
@@ -140,6 +140,8 @@ class APIKey(TimestampMixin, Base):
         nullable=False,
         index=True
     )
+
+    scopes = Column(ARRAY(String), default=[])
     expiring_at = Column(DateTime(timezone=True), nullable=False)
     
     name = Column(String(100), nullable=True)  

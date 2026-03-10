@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 import logging
 
 from shared_database.repository import APIKeyService
+from api_provider.src.api.schema import APITokenResponseSchema
 
 
 logger = logging.getLogger(__name__)
@@ -33,7 +34,7 @@ class APIService:
             is_active=True
         )
 
-        return token
+        return APITokenResponseSchema(token=token)
     
     # ================
     # Internal Helpers

@@ -33,6 +33,20 @@ services:
     depends_on:
       - db
 
+  migration:
+    build:
+      context: .
+      dockerfile: shared_database/Dockerfile
+
+    container_name: migration
+    volumes:
+      - .:/app
+
+    networks:
+      - observability
+    depends_on:
+      - db
+
   db:
     image: postgres:15
     environment:
