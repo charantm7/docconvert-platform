@@ -178,9 +178,9 @@ def get_current_user(
         request.state.user = VerificationService(db).verify_jwt_token(token)
 
 
-def require_scopes(scope: str):
-    async def _guard(user: AuthUser = Depends(get_current_user)):
-        if scope not in user.scope
+# def require_scopes(scope: str):
+#     async def _guard(user: AuthUser = Depends(get_current_user)):
+#         if scope not in user.scope
 
 
         

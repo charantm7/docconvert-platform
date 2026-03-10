@@ -38,6 +38,9 @@ services:
       context: .
       dockerfile: shared_database/Dockerfile
 
+    env_file:
+      - shared_database/.env
+
     container_name: migration
     volumes:
       - .:/app
