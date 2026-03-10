@@ -33,6 +33,25 @@ services:
     depends_on:
       - db
 
+  upload-service:
+    build:
+      context: .
+      dockerfile: upload_service/Dockerfile
+
+    container_name: upload-service
+
+    volumes:
+      - .:/app
+
+    ports:
+      - "8001:8001"
+
+    networks:
+      - observability
+
+    depends_on:
+      - db
+
   migration:
     build:
       context: .

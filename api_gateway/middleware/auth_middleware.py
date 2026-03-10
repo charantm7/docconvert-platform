@@ -20,7 +20,7 @@ class AuthUser:
     def __init__(self, user_id:str, auth_type: str, scopes: List[str] = []):
         self.user_id = user_id
         self.auth_type = auth_type
-        self.scopes = scopes
+        self.scopes = scopes 
 
         
 
@@ -46,9 +46,7 @@ class VerificationService:
         if not key_record.is_active:
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "API key has been revoked")
         
-        print(key_record)
-        
-        return AuthUser(user_id=str(key_record.user_id), auth_type="api_key")
+        return AuthUser(user_id=str(key_record.user_id), auth_type="api_key", scopes=key_record.scopes)
     
     def verify_jwt_token(self, token:str) -> AuthUser:
 
@@ -87,14 +85,30 @@ class DualAuthMiddleware:
                     "/google/login",
                     "/login",
                     "/signup",
-                    "/verify-password",
+                    "/verify-email",
+                    "/resend-email-verification",
+                    "/reset-password-request",
+                    "/reset-password",
                     "/github/login",
+                    "/twitter/login",
                     "/google/callback",
-                    "/github/callback"
+                    "/github/callback",
+                    "/twitter/callback",
                 }
     
+    scope_rules={
+        "/v1/upload/presigned"         : ["document:upload"],
+        "/v1/upload/conversion/start"  : ["convert:create"],
+        "/v1/upload/merge/start"       : ["convert:create"],
+        "/v1/read"                     : ["document:read"],
+        "/v1/documents/delete"         : ["document:delete"],
+        "/v1/convert/result"           : ["convert:read"],
+        "/v1/convert/download"         : ["convert:download"],
+        "/v1/convert/cancel"           : ["convert:cancel"],
+        "/v1/api"                      : ["api:read", "api:write"],
+    }
     
-
+    
     def __init__(self, app):
         self.app = app
 
@@ -119,6 +133,13 @@ class DualAuthMiddleware:
         
         await self.app(scope, receive, send)
 
+    def _require_scopes(self, path: str) -> list[str]:
+
+        for prefix, scope in self.scope_rules.items():
+            if path.startswith(prefix):
+                return scope
+        return []
+
     async def _resolve(self,request: Request):
         raw = request.headers.get("Authorization", "")
         scheme, token = get_authorization_scheme_param(raw)
@@ -134,9 +155,21 @@ class DualAuthMiddleware:
         try:
             service = VerificationService(db)
             if token.startswith(settings.API_KEY_PREFIX):
-                request.state.user = service.verify_api_key(token)
+                user = service.verify_api_key(token)
+
+                required = self._require_scopes(request.url.path)
+                if required:
+                    missing = [s for s in required if s not in user.scopes]
+
+                    if missing:
+                        return JSONResponse(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            content={"detail": f"Missing require scope {missing}"}
+                        )
             else:
-                request.state.user = service.verify_jwt_token(token)
+                user = service.verify_jwt_token(token)
+
+            request.state.user = user
 
             return None
 
@@ -178,9 +211,6 @@ def get_current_user(
         request.state.user = VerificationService(db).verify_jwt_token(token)
 
 
-# def require_scopes(scope: str):
-#     async def _guard(user: AuthUser = Depends(get_current_user)):
-#         if scope not in user.scope
 
 
         

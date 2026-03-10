@@ -5,10 +5,10 @@ from api_gateway.middleware.auth_middleware import get_current_user
 
 from ..settings import settings
 
-upload = APIRouter(dependencies=[Depends(get_current_user)])
+upload = APIRouter(dependencies=[Depends(get_current_user, )])
 
 
-@upload.post("/upload/presigned")
+@upload.post("/v1/upload/presigned")
 async def proxy_presigned_generation_upload(request: Request):
 
     forward_header = {
@@ -49,7 +49,7 @@ async def proxy_presigned_generation_upload(request: Request):
     )
 
 
-@upload.api_route("/upload/{path:path}", methods=["GET", "POST"])
+@upload.api_route("/v1/upload/{path:path}", methods=["GET", "POST"])
 async def proxy_presigned_generation_upload(path: str, request: Request):
 
     forward_header = {

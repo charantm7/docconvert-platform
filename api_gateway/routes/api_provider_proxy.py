@@ -7,7 +7,7 @@ from api_gateway.settings import settings
 api_provider = APIRouter(dependencies=[Depends(get_current_user)])
 
 
-@api_provider.api_route("/api/{path:path}", methods=["GET", "POST"])
+@api_provider.api_route("/v1/api/{path:path}", methods=["GET", "POST"])
 async def api_provider_route_proxy(path: str, request: Request):
 
     forward_header = {

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 import logging
 
 from shared_database.repository import APIKeyService
-from api_provider.src.api.schema import APITokenResponseSchema
+from api_provider.src.api.schema import APITokenResponseSchema, APICreationSchema
 
 
 logger = logging.getLogger(__name__)
@@ -19,22 +19,32 @@ class APIService:
         self.db = db
         self.api_repo = APIKeyService(db)
 
-    def create_new_token(self, name:str, expire_at: DateTime = datetime.now(timezone.utc) + timedelta(days=30) )-> str:
+    def create_new_token(self,data: APICreationSchema)-> str:
+
+        if data.expire_at is None:
+            data.expire_at = datetime.now(timezone.utc) + timedelta(days=30)
 
         token = API_KEY_PREFIX + self._token_generator()
 
         hashed_token = self._hash_token(token)
 
-        self.api_repo.create(
+        record = self.api_repo.create(
             hashed_key=hashed_token,
             prefix=hashed_token[:10],
-            name=name,
-            expiring_at=expire_at,
+            name=data.name,
+            expiring_at=data.expire_at,
             user_id=self.user_id,
-            is_active=True
+            is_active=True,
+            scopes=[s.value for s in data.scopes]
         )
 
-        return APITokenResponseSchema(token=token)
+        return APITokenResponseSchema(
+            token=token, 
+            id=str(record.id), 
+            expire_at=record.expiring_at, 
+            name=record.name,
+            scopes=record.scopes
+        )
     
     # ================
     # Internal Helpers

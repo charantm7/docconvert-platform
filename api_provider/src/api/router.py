@@ -9,4 +9,4 @@ provider = APIRouter()
 
 @provider.post("/create-api")
 async def create_new_api(data: APICreationSchema ,request: Request, db:Session = Depends(get_db)):
-    return APIService(request.headers.get('User-Id'), db).create_new_token(data.model_dump_json())
+    return APIService(request.headers.get('User-Id'), db).create_new_token(data)
