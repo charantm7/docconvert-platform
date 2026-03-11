@@ -2,6 +2,7 @@ import enum
 
 import sqlalchemy
 from uuid import uuid4
+from sqlalchemy.orm import relationship
 from sqlalchemy import Column, ForeignKey, String, Boolean, Date, Enum, DateTime, ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, CITEXT
 from sqlalchemy.sql import func
@@ -30,6 +31,11 @@ class TimestampMixin:
         nullable=False
     )
 
+class SubscriptionPlan(str, enum.Enum):
+    free       = "free"
+    pro        = "pro"
+    enterprise = "enterprise"
+
 
 class User(TimestampMixin, Base):
     __tablename__ = "users"
@@ -53,6 +59,8 @@ class User(TimestampMixin, Base):
     picture = Column(String, nullable=True)
 
     date_of_birth = Column(Date, nullable=True)
+
+    plan = Column(Enum(SubscriptionPlan), default=SubscriptionPlan.free)
 
     is_email_verified = Column(
         Boolean,
@@ -97,6 +105,10 @@ class User(TimestampMixin, Base):
         nullable=False,
         server_default=sqlalchemy.true()
     )
+
+    api_keys = relationship("api_key", back_populates="user", cascade="all, delete-orphan")
+
+
 
 
 class RefreshToken(Base):
@@ -147,6 +159,8 @@ class APIKey(TimestampMixin, Base):
     name = Column(String(100), nullable=True)  
 
     is_active = Column(Boolean, default=True, nullable=False)
+
+    user = relationship('User', back_populates="api_keys")
 
 
 class EmailVerificationToken(Base):
