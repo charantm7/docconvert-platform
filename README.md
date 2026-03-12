@@ -101,7 +101,7 @@ REST API for integrating document conversion into applications.
 
 ---
 
-## Getting Started
+## 🚀 Getting Started
 
 **Prerequisites:** Docker, Docker Compose
 
@@ -115,7 +115,7 @@ This starts all services: API Gateway, Upload, Conversion Workers, RabbitMQ, Pos
 
 ---
 
-## Services
+## 🖧 Services
 
 | Service | Responsibility |
 |---------|---------------|
@@ -127,7 +127,7 @@ This starts all services: API Gateway, Upload, Conversion Workers, RabbitMQ, Pos
 
 ---
 
-## How It Works
+## 💡 How It Works
 
 1. User uploads a document → stored in S3
 2. Conversion job published to RabbitMQ
@@ -137,13 +137,13 @@ This starts all services: API Gateway, Upload, Conversion Workers, RabbitMQ, Pos
 
 ---
 
-## Monitoring
+## 👀 Monitoring
 
 Prometheus is preconfigured via `prometheus.yml`. Extend with Grafana and Alertmanager as needed.
 
 ---
 
-## Roadmap
+## 🗺️ Roadmap
 
 - [ ] Web dashboard
 - [ ] Additional format support
@@ -154,7 +154,7 @@ Prometheus is preconfigured via `prometheus.yml`. Extend with Grafana and Alertm
 
 ---
 
-## Contributing
+## 🤝 Contributing
 
 ```bash
 # 1. Fork the repo
