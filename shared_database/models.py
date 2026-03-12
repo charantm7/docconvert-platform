@@ -113,7 +113,7 @@ class User(TimestampMixin, Base):
         server_default=sqlalchemy.true()
     )
 
-    api_keys = relationship("api_key", back_populates="user", cascade="all, delete-orphan")
+    api_keys = relationship("APIKey", back_populates="user", cascade="all, delete-orphan")
 
 
 class RefreshToken(Base):

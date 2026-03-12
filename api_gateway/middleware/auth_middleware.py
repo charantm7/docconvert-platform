@@ -102,6 +102,7 @@ class DualAuthMiddleware:
                 }
     
     scope_rules={
+        "/v1/upload/get"               : ["document:upload"],
         "/v1/upload/presigned"         : ["document:upload"],
         "/v1/upload/conversion/start"  : ["convert:create"],
         "/v1/upload/merge/start"       : ["convert:create"],
@@ -164,7 +165,7 @@ class DualAuthMiddleware:
 
             path = request.url.path
 
-            if path.startswith("/v1/admin") and user.rol != "admin":
+            if path.startswith("/v1/admin") and user.role != "admin":
                 return JSONResponse(403, "Admin access required")
             
             if user.auth_type == "api_key":

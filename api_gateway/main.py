@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Response, status
 from fastapi.staticfiles import StaticFiles
+from contextlib import asynccontextmanager
 from starlette.middleware.sessions import SessionMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
@@ -17,6 +18,13 @@ from api_gateway.handlers.exception_handlers import register_exception_handlers
 
 setup_logging(service_name="gateway")
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+
+    await upload_proxy._client.aclose()
+
+
 
 app = FastAPI(
     title="DocPipe",
@@ -26,7 +34,8 @@ app = FastAPI(
         "name": "Charan T M",
         "url": "https://www.linkedin.com/in/charantm/",
         "email": "charanntm.dev@gmail.com"
-    }
+    },
+    lifespan=lifespan
 )
 
 app.mount(

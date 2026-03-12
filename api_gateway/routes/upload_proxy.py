@@ -1,7 +1,6 @@
 
 import httpx
 from fastapi import APIRouter, Request, Response, Depends, HTTPException
-from api_gateway.middleware.auth_middleware import get_current_user
 
 from ..settings import settings
 
@@ -64,41 +63,28 @@ async def proxy_presigned(request: Request):
 
 @upload.api_route("/v1/upload/{path:path}", methods=["GET", "POST"])
 async def proxy_upload(path: str, request: Request):
+    
+    body = None
+    if request.method in ['POST', 'PUT', "PATCH"]:
+        body = await request.body()
 
-    forward_header = {
-        key: value
-        for key, value in request.headers.items()
-        if key.lower() not in {
-            "host",
-            "content-length",
-            "connection",
-            "transfer-encoding",
-        }
-    }
-    forward_header["User-Id"] = request.state.user.user_id
-    forward_header["Request-Id"] = request.state.request_id
+    try:
+        
+        async with httpx.AsyncClient(timeout=10) as client:
+            upstream_response = await client.request(
+                method=request.method,
+                url=f"{settings.UPLOAD_SERVICE_URL}/{path}",
+                headers=_forward_headers(request),
+                content=body,
+                params=request.query_params
+            )
 
-    json_body = await request.json()
+        return _forward_response(upstream=upstream_response)
+    
+    
+    except httpx.TimeoutException:
+        raise HTTPException(504, "Upload service timed out")
+    
+    except httpx.RequestError:
+        raise HTTPException(502, "Upload service unreachable")
 
-    async with httpx.AsyncClient(timeout=10) as client:
-        upstream_response = await client.request(
-            method=request.method,
-            url=f"{settings.UPLOAD_SERVICE_URL}/{path}",
-            headers=forward_header,
-            json=json_body
-        )
-
-    return Response(
-        content=upstream_response.content,
-        status_code=upstream_response.status_code,
-        headers={
-            key: value
-            for key, value in upstream_response.headers.items()
-            if key not in {
-                "content-length",
-                "connection",
-                "transfer-encoding",
-            }
-        },
-        media_type=upstream_response.headers.get("content-type")
-    )

@@ -1,12 +1,14 @@
 import json
 import aio_pika
-from fastapi import APIRouter, HTTPException, Header, status
+from fastapi import APIRouter, HTTPException, Header, status, Depends
+from sqlalchemy.orm import Session
 
 from upload_service.src.api.v1.upload_route.schema import PreSignedSchema, ConvertRequest, MergeRequest
 from upload_service.src.api.v1.upload_route.service import build_storage_path
 from upload_service.src.config.rabbitmq_connection import get_rabbit_connection
 from upload_service.src.storage.supabase_client import supabase
-
+from shared_database.connection import get_db
+from shared_database.repository import UserRepository
 from upload_service.settings import settings
 
 upload_service = APIRouter()
@@ -63,6 +65,12 @@ async def merge_files(body: MergeRequest):
     await connection.close()
 
     return {"message": "Merge job queued", "job_id": body.job_id}
+
+@upload_service.get("/get")
+async def get_user(db: Session = Depends(get_db)):
+
+    return UserRepository(db).get_by_email("charantm8787@gmail.com")
+
 
 
 @upload_service.post("/conversion/start")
