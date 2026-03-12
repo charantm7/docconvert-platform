@@ -17,10 +17,12 @@ security = HTTPBearer(auto_error=False)
 
 class AuthUser:
 
-    def __init__(self, user_id:str, auth_type: str, scopes: List[str] = []):
+    def __init__(self, user_id:str, role: str, auth_type: str, plan: str, scopes: List[str] = []):
         self.user_id = user_id
         self.auth_type = auth_type
-        self.scopes = scopes 
+        self.plan = plan
+        self.role = role
+        self.scopes = scopes
 
         
 
@@ -46,7 +48,7 @@ class VerificationService:
         if not key_record.is_active:
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "API key has been revoked")
         
-        return AuthUser(user_id=str(key_record.user_id), auth_type="api_key", scopes=key_record.scopes)
+        return AuthUser(user_id=str(key_record.user_id), role=key_record.user.role ,plan=key_record.user.plan, auth_type="api_key", scopes=key_record.scopes)
     
     def verify_jwt_token(self, token:str) -> AuthUser:
 
@@ -66,7 +68,10 @@ class VerificationService:
         
         return AuthUser(
             user_id=str(user.id),
-            auth_type="jwt"
+            auth_type="jwt",
+            scopes=[],
+            plan=user.plan,
+            role=user.role
         )
 
     def _hash_token(self, data: str) -> str:
@@ -154,9 +159,15 @@ class DualAuthMiddleware:
 
         try:
             service = VerificationService(db)
-            if token.startswith(settings.API_KEY_PREFIX):
-                user = service.verify_api_key(token)
 
+            user = (service.verify_api_key(token) if token.startswith(settings.API_KEY_PREFIX) else service.verify_jwt_token(token))
+
+            path = request.url.path
+
+            if path.startswith("/v1/admin") and user.rol != "admin":
+                return JSONResponse(403, "Admin access required")
+            
+            if user.auth_type == "api_key":
                 required = self._require_scopes(request.url.path)
                 if required:
                     missing = [s for s in required if s not in user.scopes]
@@ -166,9 +177,7 @@ class DualAuthMiddleware:
                             status_code=status.HTTP_403_FORBIDDEN,
                             content={"detail": f"Missing require scope {missing}"}
                         )
-            else:
-                user = service.verify_jwt_token(token)
-
+            
             request.state.user = user
 
             return None

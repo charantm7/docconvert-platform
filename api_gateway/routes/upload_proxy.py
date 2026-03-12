@@ -1,56 +1,69 @@
 
 import httpx
-from fastapi import APIRouter, Request, Response, Depends
+from fastapi import APIRouter, Request, Response, Depends, HTTPException
 from api_gateway.middleware.auth_middleware import get_current_user
 
 from ..settings import settings
 
-upload = APIRouter(dependencies=[Depends(get_current_user, )])
+upload = APIRouter()
+
+_client = httpx.AsyncClient(timeout=10)
+
+STRIP_REQUEST_HEADERS  = {"host", "content-length", "connection", "transfer-encoding"}
+STRIP_RESPONSE_HEADERS = {"content-length", "connection", "transfer-encoding"}
 
 
-@upload.post("/v1/upload/presigned")
-async def proxy_presigned_generation_upload(request: Request):
-
-    forward_header = {
+def _forward_headers(request: Request) -> dict:
+    headers = {
         key: value
         for key, value in request.headers.items()
-        if key.lower() not in {
-            "host",
-            "content-length",
-            "connection",
-            "transfer-encoding",
-        }
+        if key.lower() not in STRIP_REQUEST_HEADERS
     }
-    forward_header["User-Id"] = request.state.user.user_id
-    forward_header["Request-Id"] = request.state.request_id
 
-    json_body = await request.json()
+    headers["User-Id"] = request.state.user.user_id
+    headers["Request-Id"] = request.state.request_id
+    headers["X-Auth-Type"]  = request.state.user.auth_type
 
-    async with httpx.AsyncClient(timeout=10) as client:
-        upstream_response = await client.post(
-            url=f"{settings.UPLOAD_SERVICE_URL}/upload/presigned",
-            headers=forward_header,
-            json=json_body
-        )
+    return headers
+
+def _forward_response(upstream: httpx.Response) -> dict:
 
     return Response(
-        content=upstream_response.content,
-        status_code=upstream_response.status_code,
-        headers={
+        content=upstream.content,
+        status_code=upstream.status_code,
+        headers = {
             key: value
-            for key, value in upstream_response.headers.items()
-            if key not in {
-                "content-length",
-                "connection",
-                "transfer-encoding",
-            }
+            for key, value in upstream.headers.items()
+            if key.lower() not in STRIP_RESPONSE_HEADERS
         },
-        media_type=upstream_response.headers.get("content-type")
+        media_type = upstream.headers.get("content-type")
     )
+
+    
+
+@upload.post("/v1/upload/presigned")
+async def proxy_presigned(request: Request):
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            upstream = await client.post(
+                url=f"{settings.UPLOAD_SERVICE_URL}/upload/presigned",
+                headers=_forward_headers(request),
+                json=await request.json()
+            )
+        return _forward_response(upstream=upstream)
+    
+    except httpx.TimeoutException:
+        raise HTTPException(504, "Upload service timed out")
+    
+    except httpx.RequestError:
+        raise HTTPException(502, "Upload service unreachable")
+
+        
 
 
 @upload.api_route("/v1/upload/{path:path}", methods=["GET", "POST"])
-async def proxy_presigned_generation_upload(path: str, request: Request):
+async def proxy_upload(path: str, request: Request):
 
     forward_header = {
         key: value

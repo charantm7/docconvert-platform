@@ -17,6 +17,11 @@ class AuthProviders(str, enum.Enum):
     GitHub = "GitHub"
     Twitter = "Twitter"
 
+class Role(str, enum.Enum):
+
+    user = "user"
+    admin = "admin"
+
 
 class TimestampMixin:
     created_at = Column(
@@ -59,6 +64,8 @@ class User(TimestampMixin, Base):
     picture = Column(String, nullable=True)
 
     date_of_birth = Column(Date, nullable=True)
+
+    role = Column(Enum(Role), default=Role.user)
 
     plan = Column(Enum(SubscriptionPlan), default=SubscriptionPlan.free)
 
@@ -107,8 +114,6 @@ class User(TimestampMixin, Base):
     )
 
     api_keys = relationship("api_key", back_populates="user", cascade="all, delete-orphan")
-
-
 
 
 class RefreshToken(Base):

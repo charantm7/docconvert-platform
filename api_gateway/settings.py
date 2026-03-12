@@ -10,7 +10,6 @@ class Settings(BaseSettings):
     DOWNLOAD_SERVICE_URL: str
     API_PROVIDER_SERVICE_URL: str
 
-
     # Database
     DB_NAME: str
     DB_USER: str
@@ -18,6 +17,8 @@ class Settings(BaseSettings):
     DB_HOST: str
     DB_PORT: int
     POSTGRES_URL: str
+
+    REDIS_CONNECTION: str
 
     API_KEY_PREFIX: str
 
