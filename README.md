@@ -1,50 +1,103 @@
 <p align="center" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
-  <img width="170" height="170" alt="image" src="https://github.com/user-attachments/assets/5db2afc3-e0b6-437b-867f-7fe7da9f98bc" />
-  <img width
+  <img width="150" height="150" alt="image" src="https://github.com/user-attachments/assets/5ff077f7-8ce1-4468-b22b-e2d1c02a5323" />
+  <img width="130" height="130" alt="image" src="loop.png" />
   <img width="140" height="140" alt="image" src="https://github.com/user-attachments/assets/04ac913f-1fa3-4ace-af1a-e6b3f8d3adc3" />  
 </p>
-<h1>DocConvert</h1>
+<p align="center">
+A scalable document processing API for developers.
+</p>
 
+# <img width="50" height="50" alt="image" src="https://github.com/user-attachments/assets/b8d174be-7d0a-4706-8ab0-88d1193ed518" /> DocConvert
 
-A scalable document conversion platform built on microservices — upload, convert, and download documents through secure, async APIs.
+> **A scalable document conversion platform built on microservices — upload, convert, and download documents through secure, async APIs.**
 
 ---
-
-## Architecture
+### ⚒ Architecture
 
 ```
-Client
-  └─► API Gateway (Auth + Rate Limiting)
-        └─► Upload Service → S3
-              └─► RabbitMQ
-                    ├─► Conversion Workers → S3
-                    └─► Status Service → PostgreSQL
-                              └─► Download Service
+                        ┌─────────────────────────────────────────────┐
+                        │               API Gateway                   │
+                        │                                             │
+   Bearer Token  ──────►│  JWT Validator                              │
+                        │  └── Decode & verify signature              │
+                        │  └── Extract user + roles                   │
+                        │                                             │
+   X-API-Key     ──────►│  API Key Validator                          │
+                        │  └── DB lookup                              │
+                        │  └── Resolve scopes & role                  │
+                        │                                             │
+                        │  Rate Limiter (plan · key · role)           │
+                        └───────────────────┬─────────────────────────┘
+                                            │
+                               ┌────────────▼────────────┐
+                               │      Upload Service     │
+                               └────────────┬────────────┘
+                                            │
+                                     store  │  publish job
+                                 ┌──────────▼──────────┐
+                                 │  Supabase Storage   │
+                                 └─────────────────────┘
+                                            │
+                                   ┌────────▼────────┐
+                                   │    RabbitMQ     │
+                                   └────────┬────────┘
+                                            │
+                          ┌─────────────────┴────────────────┐
+                          │                                  │
+               ┌──────────▼──────────┐             ┌─────────▼─────────┐
+               │  Conversion Workers │             │  Status Service   │
+               │  └── process file   │             │  └── track jobs   │
+               │  └── store result   │             │  └── PostgreSQL   │
+               └──────────┬──────────┘             └───────────────────┘
+                          │
+                   ┌──────▼──────┐
+                   │ S3 Storage  │
+                   └──────┬──────┘
+                          │
+                 ┌─────────▼─────────┐
+                 │  Download Service │
+                 └───────────────────┘
 ```
 
 ---
 
-## Features
+## ✨ Features
 
-- **Auth** — JWT, API Keys, OAuth2, scope-based + role-based access control
-- **Rate Limiting** — per user plan, API key, and role
-- **Async Processing** — RabbitMQ job queue with scalable conversion workers
-- **Formats** — PDF, DOCX, XLSX, TXT, and more
-- **Storage** — S3-compatible object storage
-- **Observability** — Prometheus metrics + structured logging
+**Security**
+- JWT, API Keys, OAuth2
+- Scope-based and role-based access control
+
+**Platform**
+- Rate limiting per user plan, API key, and role
+- RabbitMQ-based async processing
+- S3-compatible object storage
+- Prometheus metrics and structured logging
+
+**Document Tools**
+- PDF → Word
+- PDF → PowerPoint
+- Compress PDF
+- Merge / Split PDF
+- Protect / Unlock PDF
+- Rotate / Remove Pages
+- PDF → Image
+
+**Developer API**
+REST API for integrating document conversion into applications.
 
 ---
 
-## Tech Stack
+## 🛠️ Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
 | Backend | Python, FastAPI |
 | Queue | RabbitMQ |
-| Database | PostgreSQL, SQLAlchemy |
-| Storage | S3-compatible |
+| Storage | Supabase Storage |
 | Auth | JWT, OAuth2, API Keys |
-| DevOps | Docker, Docker Compose, Prometheus |
+| Database | PostgreSQL, SQLAlchemy |
+| Tools | Alembic, Pydantic, pdf2docx, pypdf |
+| DevOps | Docker, Docker Compose, Prometheus, Grafana |
 
 ---
 
