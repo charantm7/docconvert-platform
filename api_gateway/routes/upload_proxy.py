@@ -2,6 +2,7 @@
 import httpx
 from fastapi import APIRouter, Request, Response, Depends, HTTPException
 
+from api_gateway.middleware.ratelimiter import limiter, get_limiter_for_user
 from ..settings import settings
 
 upload = APIRouter()
@@ -41,15 +42,15 @@ def _forward_response(upstream: httpx.Response) -> dict:
     
 
 @upload.post("/v1/upload/presigned")
+@limiter.limit(get_limiter_for_user)
 async def proxy_presigned(request: Request):
 
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            upstream = await client.post(
-                url=f"{settings.UPLOAD_SERVICE_URL}/upload/presigned",
-                headers=_forward_headers(request),
-                json=await request.json()
-            )
+        upstream = await _client.post(
+            url=f"{settings.UPLOAD_SERVICE_URL}/upload/presigned",
+            headers=_forward_headers(request),
+            json=await request.json()
+        )
         return _forward_response(upstream=upstream)
     
     except httpx.TimeoutException:
@@ -62,6 +63,7 @@ async def proxy_presigned(request: Request):
 
 
 @upload.api_route("/v1/upload/{path:path}", methods=["GET", "POST"])
+@limiter.limit(get_limiter_for_user)
 async def proxy_upload(path: str, request: Request):
     
     body = None
@@ -69,15 +71,13 @@ async def proxy_upload(path: str, request: Request):
         body = await request.body()
 
     try:
-        
-        async with httpx.AsyncClient(timeout=10) as client:
-            upstream_response = await client.request(
-                method=request.method,
-                url=f"{settings.UPLOAD_SERVICE_URL}/{path}",
-                headers=_forward_headers(request),
-                content=body,
-                params=request.query_params
-            )
+        upstream_response = await _client.request(
+            method=request.method,
+            url=f"{settings.UPLOAD_SERVICE_URL}/{path}",
+            headers=_forward_headers(request),
+            content=body,
+            params=request.query_params
+        )
 
         return _forward_response(upstream=upstream_response)
     
