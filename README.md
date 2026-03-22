@@ -14,7 +14,7 @@ A scalable document processing API for developers.
 ---
 ### ⚒ Architecture
 
-[![Home](docconvert_sd_dark.png)](https://github.com/charantm7/Chat-Hub)
+[![Home](docconvert_sd_dark.png)](docconvert_sd_dark.png)
 
 ---
 
