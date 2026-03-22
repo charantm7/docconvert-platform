@@ -14,50 +14,7 @@ A scalable document processing API for developers.
 ---
 ### ⚒ Architecture
 
-```
-                        ┌─────────────────────────────────────────────┐
-                        │               API Gateway                   │
-                        │                                             │
-   Bearer Token  ──────►│  JWT Validator                              │
-                        │  └── Decode & verify signature              │
-                        │  └── Extract user + roles                   │
-                        │                                             │
-   X-API-Key     ──────►│  API Key Validator                          │
-                        │  └── DB lookup                              │
-                        │  └── Resolve scopes & role                  │
-                        │                                             │
-                        │  Rate Limiter (plan · key · role)           │
-                        └───────────────────┬─────────────────────────┘
-                                            │
-                               ┌────────────▼────────────┐
-                               │      Upload Service     │
-                               └────────────┬────────────┘
-                                            │
-                                     store  │  publish job
-                                 ┌──────────▼──────────┐
-                                 │  Supabase Storage   │
-                                 └─────────────────────┘
-                                            │
-                                   ┌────────▼────────┐
-                                   │    RabbitMQ     │
-                                   └────────┬────────┘
-                                            │
-                          ┌─────────────────┴────────────────┐
-                          │                                  │
-               ┌──────────▼──────────┐             ┌─────────▼─────────┐
-               │  Conversion Workers │             │  Status Service   │
-               │  └── process file   │             │  └── track jobs   │
-               │  └── store result   │             │  └── PostgreSQL   │
-               └──────────┬──────────┘             └───────────────────┘
-                          │
-                   ┌──────▼──────┐
-                   │ S3 Storage  │
-                   └──────┬──────┘
-                          │
-                 ┌─────────▼─────────┐
-                 │  Download Service │
-                 └───────────────────┘
-```
+[![Home](docconvert_sd_dark.png)](https://github.com/charantm7/Chat-Hub)
 
 ---
 
