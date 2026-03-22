@@ -38,15 +38,11 @@ def get_limiter_for_user(request: Request) -> str:
     if not user:
         return UNAUTHENTICATED_LIMIT
     
-    if user.role in ROLE_LIMITS:
+    if getattr(user, "role", None) in ROLE_LIMITS:
         return ROLE_LIMITS[user.role]
 
-    return PLAN_LIMITS.get(user.plan, PLAN_LIMITS["free"])
+    return PLAN_LIMITS.get(getattr(user, "plan", None), PLAN_LIMITS["free"])
         
-    
 
-    
-    
-
-    
-    
+def dynamic_limit(request: Request):
+    return get_limiter_for_user(request)

@@ -2,7 +2,7 @@
 import httpx
 from fastapi import APIRouter, Request, Response, Depends, HTTPException
 
-from api_gateway.middleware.ratelimiter import limiter, get_limiter_for_user
+from api_gateway.middleware.ratelimiter import limiter, get_limiter_for_user, dynamic_limit
 from ..settings import settings
 
 upload = APIRouter()
@@ -42,7 +42,7 @@ def _forward_response(upstream: httpx.Response) -> dict:
     
 
 @upload.post("/v1/upload/presigned")
-@limiter.limit(get_limiter_for_user)
+@limiter.limit(lambda request: get_limiter_for_user(request=request))
 async def proxy_presigned(request: Request):
 
     try:

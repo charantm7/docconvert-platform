@@ -116,6 +116,6 @@ async def twitter_callback(request: Request, db: Session = Depends(get_db)):
     return await OauthService(db).twitter_callback_service(request)
 
 
-@auth.get("/v1/admin")
+@auth.get("/v1/admi")
 async def get_by(db: Session = Depends(get_db)):
     return UserRepository(db).get_by_email("charantm8787@gmail.com")
