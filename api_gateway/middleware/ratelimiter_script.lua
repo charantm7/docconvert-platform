@@ -1,27 +1,31 @@
--- KEYS[1] = key
--- ARGV[1] = current timestamp (ms)
--- ARGV[2] = window size (ms)
--- ARGV[3] = max requests
-
 local key = KEYS[1]
-local now = tonumber(ARGV[1])
-local window = tonumber(ARGV[2])
-local limit = tonumber(ARGV[3])
 
--- remove old requests
-redis.call("ZREMRANGEBYSCORE", key, 0, now - window)
+local capacity = tonumber(ARGV[1])
+local refill_rate = tonumber(ARGV[2]) -- tokens per second
+local now = tonumber(ARGV[3])
 
--- count current requests
-local count = redis.call("ZCARD", key)
+local data = redis.call("HMGET", key, "tokens", "timestamp")
 
-if count >= limit then
+local tokens = tonumber(data[1])
+local last_time = tonumber(data[2])
+
+if tokens == nil then
+    tokens = capacity
+    last_time = now
+end
+
+-- refill tokens
+local delta = math.max(0, now - last_time)
+local refill = delta * refill_rate
+tokens = math.min(capacity, tokens + refill)
+
+if tokens < 1 then
     return 0
 end
 
--- add current request
-redis.call("ZADD", key, now, now)
+tokens = tokens - 1
 
--- set expiry
-redis.call("PEXPIRE", key, window)
+redis.call("HMSET", key, "tokens", tokens, "timestamp", now)
+redis.call("EXPIRE", key, 3600)
 
 return 1

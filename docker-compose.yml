@@ -81,7 +81,7 @@ services:
       - observability
 
   redis:
-    image: redis:7
+    image: redis:7-alpine
     container_name: redis
     restart: always
     ports:

@@ -169,7 +169,7 @@ class DualAuthMiddleware:
                 return JSONResponse(403, "Admin access required")
             
             if user.auth_type == "api_key":
-                required = self._require_scopes(request.url.path)
+                required = self._require_scopes(path)
                 if required:
                     missing = [s for s in required if s not in user.scopes]
 

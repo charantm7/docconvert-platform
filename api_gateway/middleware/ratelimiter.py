@@ -1,9 +1,8 @@
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from fastapi import Request
+from fastapi import Request, HTTPException
 
 from api_gateway.settings import settings
-
 
 
 def get_identifier(request: Request) -> str:
@@ -15,34 +14,65 @@ def get_identifier(request: Request) -> str:
     return get_remote_address(request)
 
 
-limiter = Limiter(key_func=get_identifier, storage_uri=settings.REDIS_CONNECTION)
+limiter = Limiter(key_func=get_identifier,
+                  storage_uri=settings.REDIS_CONNECTION)
 
 
-ROLE_LIMITS = {
-    "admin": "10000/hour",          
+PLAN_CONFIG = {
+    "admin": {
+        "capacity": 10000,
+        "refill_rate": 10000 / 3600
+    },
+    "free": {
+        "capacity": 100,
+        "refill_rate": 100 / 3600
+    },
+    "pro": {
+        "capacity": 1000,
+        "refill_rate": 1000 / 3600
+    },
+    "enterprise": {
+        "capacity": 5000,
+        "refill_rate": 5000 / 3600
+    }
 }
 
-PLAN_LIMITS = {
-    "free"       : "100/hour",
-    "pro"        : "1000/hour",
-    "enterprise" : "5000/hour",
-}
 
-UNAUTHENTICATED_LIMIT = "20/hour" 
+class RatelimiterMiddleware:
 
+    def __init__(self, app, limiter):
+        self.app = app
+        self.limiter = limiter
 
-def get_limiter_for_user(request: Request) -> str:
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
 
-    user = getattr(request.state, "user", None)
+        request = Request(scope, receive)
 
-    if not user:
-        return UNAUTHENTICATED_LIMIT
-    
-    if getattr(user, "role", None) in ROLE_LIMITS:
-        return ROLE_LIMITS[user.role]
+        limiter = self.limiter(request)
 
-    return PLAN_LIMITS.get(getattr(user, "plan", None), PLAN_LIMITS["free"])
-        
+        identifier = get_identifier(request)
+        user = getattr(request.state, "user", None)
 
-def dynamic_limit(request: Request):
-    return get_limiter_for_user(request)
+        if user and user.role == "admin":
+            await self.app(scope, receive, send)
+            return
+
+        if not user:
+            config = {"capacity": 20, "refill_rate": 20/3600}
+
+        else:
+            config = PLAN_CONFIG.get(user.plan, PLAN_CONFIG["free"])
+
+        allowed = await limiter.allow(
+            key=f"rate:{identifier}",
+            capacity=config["capacity"],
+            refill_rate=config["refill_rate"]
+        )
+
+        if not allowed:
+            raise HTTPException(429, "Rate limit exceeded")
+
+        await self.app(scope, receive, send)
