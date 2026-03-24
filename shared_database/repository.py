@@ -5,7 +5,7 @@ from sqlalchemy import select, exists
 from sqlalchemy.orm import Session
 
 from api_gateway.handlers.decorators import handle_db_error
-from shared_database.models import User, EmailVerificationToken, PasswordResetToken, APIKey
+from shared_database.models import User, EmailVerificationToken, PasswordResetToken, APIKey, Jobs
 
 
 class UserRepository:
@@ -22,18 +22,18 @@ class UserRepository:
     @handle_db_error(stage="get_user_by_id", message="Database error while fetching user by id")
     def get_by_id(self, user_id: uuid.UUID) -> User | None:
         return self.db.get(User, user_id)
-        
-    def get_by_email(self, email: str) -> User | None:   
+
+    def get_by_email(self, email: str) -> User | None:
         stmt = select(User).where(User.email == email)
         return self.db.execute(stmt).scalar_one_or_none()
-    
+
     @handle_db_error(stage="get_user_by_username", message="Database error while fetching user by username")
     def get_by_username(self, username: str) -> User | None:
         stmt = select(User).where(User.username == username)
         return self.db.execute(stmt).scalar_one_or_none()
 
-
     # Commands
+
     @handle_db_error(stage="user_creation_failure", message="Database error during user creation")
     def create(self, **fields) -> User:
         user = User(**fields)
@@ -41,12 +41,12 @@ class UserRepository:
         self.db.commit()
         self.db.refresh(user)
         return user
-    
+
     @handle_db_error(stage="email_existence_check", message="Database error while checking email existence")
     def exists_by_email(self, email: str) -> bool:
         stmt = select(exists().where(User.email == email))
         return self.db.execute(stmt).scalar()
-        
+
     @handle_db_error(stage="update_last_login", message="Failed to update last login")
     def update_last_login(
         self,
@@ -67,7 +67,7 @@ class UserRepository:
     def update_email_verification_sent_at(self, user: User) -> None:
         user.email_verification_sent_at = datetime.now(timezone.utc)
         self.db.commit()
-    
+
     @handle_db_error(stage="update_email_verified_at", message="Failed to update email verified at")
     def update_email_verified_at(self, user_id: uuid.UUID) -> None:
         user = self.get_by_id(user_id)
@@ -117,6 +117,7 @@ class EmailRepository:
         token = EmailVerificationToken(**fields)
         self.db.add(token)
         self.db.commit()
+
     @handle_db_error(stage="is_email_verification_token_exists", message="Failed at to check the email verification token exists")
     def is_token_exists(self, hashed_token: str) -> EmailVerificationToken:
         stmt = select(EmailVerificationToken).where(
@@ -130,16 +131,13 @@ class EmailRepository:
 
 
 class APIKeyService:
-    
+
     def __init__(self, db: Session):
         self.db = db
-
 
     def get_by_key(self, hashed_key: str) -> APIKey | None:
         stmt = select(APIKey).where(APIKey.hashed_key == hashed_key)
         return self.db.execute(stmt).scalar_one_or_none()
-
-
 
     def create(self, **field) -> APIKey:
         new_key = APIKey(**field)
@@ -147,3 +145,27 @@ class APIKeyService:
         self.db.commit()
         self.db.refresh(new_key)
         return new_key
+
+
+class JobRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    @handle_db_error("create_job_record", "Error while creating new job record")
+    def create(self, **kwargs) -> Jobs:
+        job_record = Jobs(**kwargs)
+        self.db.add(job_record)
+        self.db.commit()
+        self.db.refresh(job_record)
+        return job_record
+
+    @handle_db_error("fetch_job_using_id", "Error while fetching job using id")
+    def _get_by_job_id(self, id) -> Jobs:
+        stmt = select(Jobs).where(Jobs.id == id)
+        return self.db.execute(stmt).scalar_one_or_none()
+
+    @handle_db_error("update_output_url", "Error while updating output_url job record")
+    def update_output_url(self, job_id, output_url) -> None:
+        record = self._get_by_job_id(job_id)
+        record.output_url = output_url
+        self.db.commit()

@@ -17,6 +17,23 @@ class AuthProviders(str, enum.Enum):
     GitHub = "GitHub"
     Twitter = "Twitter"
 
+
+class JobStatus(str, enum.Enum):
+
+    processing = "processing"
+    completed = "completed"
+    failed = "failed"
+
+
+class ConversionType(str, enum.Enum):
+
+    convert_pdf_to_ppt = "convert_pdf_to_ppt"
+    convert_docx_to_pdf = "convert_docx_to_pdf"
+    convert_pdf_to_docx = "convert_pdf_to_docx"
+    compress_pdf = "compress_pdf"
+    merge_pdf = "merge_pdf"
+
+
 class Role(str, enum.Enum):
 
     user = "user"
@@ -36,9 +53,10 @@ class TimestampMixin:
         nullable=False
     )
 
+
 class SubscriptionPlan(str, enum.Enum):
-    free       = "free"
-    pro        = "pro"
+    free = "free"
+    pro = "pro"
     enterprise = "enterprise"
 
 
@@ -113,7 +131,8 @@ class User(TimestampMixin, Base):
         server_default=sqlalchemy.true()
     )
 
-    api_keys = relationship("APIKey", back_populates="user", cascade="all, delete-orphan")
+    api_keys = relationship(
+        "APIKey", back_populates="user", cascade="all, delete-orphan")
 
 
 class RefreshToken(Base):
@@ -152,7 +171,7 @@ class APIKey(TimestampMixin, Base):
     prefix = Column(String(12), nullable=False, index=True)
 
     user_id = Column(
-        PG_UUID(as_uuid=True), 
+        PG_UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True
@@ -160,8 +179,8 @@ class APIKey(TimestampMixin, Base):
 
     scopes = Column(ARRAY(String), default=[])
     expiring_at = Column(DateTime(timezone=True), nullable=False)
-    
-    name = Column(String(100), nullable=True)  
+
+    name = Column(String(100), nullable=True)
 
     is_active = Column(Boolean, default=True, nullable=False)
 
@@ -190,3 +209,16 @@ class PasswordResetToken(Base):
         "users.id", ondelete="CASCADE"))
     expires_at = Column(DateTime(timezone=True), nullable=False)
     used = Column(Boolean, default=False)
+
+
+class Jobs(Base, TimestampMixin):
+    __tablename__ = "jobs"
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True)
+    user_id = Column(PG_UUID(as_uuid=True), ForeignKey(
+        "users.id", ondelete="CASCADE"))
+    status = Column(Enum(JobStatus, name="job_status"), nullable=False)
+    conversion_type = Column(
+        Enum(ConversionType, name="job_conversion_type"), nullable=False)
+    input_url = Column(String, nullable=False)
+    output_url = Column(String)

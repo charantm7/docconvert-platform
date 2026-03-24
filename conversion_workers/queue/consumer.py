@@ -25,6 +25,7 @@ async def start_consumer():
                 try:
                     data = json.loads(message.body)
 
+                    user_id = data["user_id"]
                     job_id = data["job_id"]
                     path = data["path"]
                     target_format = data["target_format"]
@@ -32,20 +33,25 @@ async def start_consumer():
                     print(f'[worker] recieved job id {job_id}')
 
                     if target_format == "docx":
-                        Conversion(supabase).convert_pdf_to_docx(job_id, path)
-                    
+                        Conversion(supabase).convert_pdf_to_docx(
+                            job_id, path, )
+
                     elif target_format == "pdf":
-                        Conversion(supabase).convert_docx_to_pdf(job_id, path)
+                        Conversion(supabase).convert_docx_to_pdf(
+                            job_id, path, user_id)
 
                     elif target_format == "pptx":
-                        Conversion(supabase).convert_pdf_to_ppt(job_id, path)
+                        Conversion(supabase).convert_pdf_to_ppt(
+                            job_id, path, user_id)
 
                     elif target_format == "merge":
-                        Customization(supabase).merge_pdf(job_id, path)
+                        Customization(supabase).merge_pdf(
+                            job_id, path, user_id)
 
                     elif target_format == "compress":
-                        Compression(supabase).compress_pdf(job_id, path)
-                    
+                        Compression(supabase).compress_pdf(
+                            job_id, path, user_id)
+
                     else:
                         raise ValueError("Unsupported Formate")
 

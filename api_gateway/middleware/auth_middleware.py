@@ -15,16 +15,16 @@ from sqlalchemy.orm import Session
 
 security = HTTPBearer(auto_error=False)
 
+
 class AuthUser:
 
-    def __init__(self, user_id:str, role: str, auth_type: str, plan: str, scopes: List[str] = []):
+    def __init__(self, user_id: str, role: str, auth_type: str, plan: str, scopes: List[str] = []):
         self.user_id = user_id
         self.auth_type = auth_type
         self.plan = plan
         self.role = role
         self.scopes = scopes
 
-        
 
 class VerificationService:
 
@@ -32,25 +32,27 @@ class VerificationService:
         self.db = db
         self.api_repo = APIKeyService(db)
         self.user_repo = UserRepository(db)
-     
+
     def verify_api_key(self, token: str) -> AuthUser:
-        
 
         hashed_token = self._hash_token(token)
         key_record = self.api_repo.get_by_key(hashed_key=hashed_token)
 
         if not key_record:
-            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid API key")
-        
+            raise HTTPException(
+                status.HTTP_401_UNAUTHORIZED, "Invalid API key")
+
         if key_record.expiring_at < datetime.now(timezone.utc):
-            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "API Key expired")
+            raise HTTPException(
+                status.HTTP_401_UNAUTHORIZED, "API Key expired")
 
         if not key_record.is_active:
-            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "API key has been revoked")
-        
-        return AuthUser(user_id=str(key_record.user_id), role=key_record.user.role ,plan=key_record.user.plan, auth_type="api_key", scopes=key_record.scopes)
-    
-    def verify_jwt_token(self, token:str) -> AuthUser:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED,
+                                "API key has been revoked")
+
+        return AuthUser(user_id=str(key_record.user_id), role=key_record.user.role, plan=key_record.user.plan, auth_type="api_key", scopes=key_record.scopes)
+
+    def verify_jwt_token(self, token: str) -> AuthUser:
 
         try:
             payload = validate_jwt_token(token)
@@ -63,9 +65,10 @@ class VerificationService:
         user_id = payload.get("sub")
         user = self.user_repo.get_by_id(user_id=user_id)
 
-        if not user.is_active:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "User not exists or not active")
-        
+        if user is None or not user.is_active:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                                "User not exists or not active")
+
         return AuthUser(
             user_id=str(user.id),
             auth_type="jwt",
@@ -80,12 +83,12 @@ class VerificationService:
 
 class DualAuthMiddleware:
 
-    PUBLIC_PATHS = {"/", 
-                    "/docs", 
-                    "/redoc", 
-                    "/openapi.json", 
+    PUBLIC_PATHS = {"/",
+                    "/docs",
+                    "/redoc",
+                    "/openapi.json",
                     "/favicon.ico",
-                    "/health", 
+                    "/health",
                     "/metrics",
                     "/google/login",
                     "/login",
@@ -99,44 +102,42 @@ class DualAuthMiddleware:
                     "/google/callback",
                     "/github/callback",
                     "/twitter/callback",
-                }
-    
-    scope_rules={
-        "/v1/upload/get"               : ["document:upload"],
-        "/v1/upload/presigned"         : ["document:upload"],
-        "/v1/upload/conversion/start"  : ["convert:create"],
-        "/v1/upload/merge/start"       : ["convert:create"],
-        "/v1/read"                     : ["document:read"],
-        "/v1/documents/delete"         : ["document:delete"],
-        "/v1/convert/result"           : ["convert:read"],
-        "/v1/convert/download"         : ["convert:download"],
-        "/v1/convert/cancel"           : ["convert:cancel"],
-        "/v1/api"                      : ["api:read", "api:write"],
+                    }
+
+    scope_rules = {
+        "/v1/upload/get": ["document:upload"],
+        "/v1/upload/presigned": ["document:upload"],
+        "/v1/upload/conversion/start": ["convert:create"],
+        "/v1/upload/merge/start": ["convert:create"],
+        "/v1/read": ["document:read"],
+        "/v1/documents/delete": ["document:delete"],
+        "/v1/convert/result": ["convert:read"],
+        "/v1/convert/download": ["convert:download"],
+        "/v1/convert/cancel": ["convert:cancel"],
+        "/v1/api": ["api:read", "api:write"],
     }
-    
-    
+
     def __init__(self, app):
         self.app = app
-
 
     async def __call__(self, scope, receive, send):
 
         if scope["type"] != "http":
             await self.app(scope, receive, send)
-            return 
-        
+            return
+
         request = Request(scope, receive, send)
 
         if request.url.path in self.PUBLIC_PATHS:
             await self.app(scope, receive, send)
             return
-        
+
         response = await self._resolve(request)
-        
+
         if response:
             await response(scope, receive, send)
             return
-        
+
         await self.app(scope, receive, send)
 
     def _require_scopes(self, path: str) -> list[str]:
@@ -146,7 +147,7 @@ class DualAuthMiddleware:
                 return scope
         return []
 
-    async def _resolve(self,request: Request):
+    async def _resolve(self, request: Request):
         raw = request.headers.get("Authorization", "")
         scheme, token = get_authorization_scheme_param(raw)
 
@@ -161,13 +162,14 @@ class DualAuthMiddleware:
         try:
             service = VerificationService(db)
 
-            user = (service.verify_api_key(token) if token.startswith(settings.API_KEY_PREFIX) else service.verify_jwt_token(token))
+            user = (service.verify_api_key(token) if token.startswith(
+                settings.API_KEY_PREFIX) else service.verify_jwt_token(token))
 
             path = request.url.path
 
             if path.startswith("/v1/admin") and user.role != "admin":
                 return JSONResponse(403, "Admin access required")
-            
+
             if user.auth_type == "api_key":
                 required = self._require_scopes(path)
                 if required:
@@ -176,9 +178,10 @@ class DualAuthMiddleware:
                     if missing:
                         return JSONResponse(
                             status_code=status.HTTP_403_FORBIDDEN,
-                            content={"detail": f"Missing require scope {missing}"}
+                            content={
+                                "detail": f"Missing require scope {missing}"}
                         )
-            
+
             request.state.user = user
 
             return None
@@ -191,20 +194,19 @@ class DualAuthMiddleware:
 
         finally:
             db.close()
-            
 
-        
+
 def get_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
 ) -> AuthUser:
-    
+
     user = getattr(request.state, 'user', None)
 
     if user:
         return user
-    
+
     if not credentials:
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED,
@@ -212,17 +214,9 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    
     token = credentials.credentials
 
     if token.startswith(settings.API_KEY_PREFIX):
         request.state.user = VerificationService(db).verify_api_key(token)
     else:
         request.state.user = VerificationService(db).verify_jwt_token(token)
-
-
-
-
-        
-
-

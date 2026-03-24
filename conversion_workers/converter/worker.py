@@ -11,6 +11,10 @@ from pdf2docx import Converter
 
 from conversion_workers.settings import settings
 
+from sqlalchemy.orm import Session
+from shared_database.repository import JobRepository
+from shared_database.models import JobStatus
+
 # Exceptions
 from conversion_workers.exception import (
     LibreOfficeNotFoundError,
@@ -55,18 +59,19 @@ class LibreOfficeConverter:
                 timeout=self.timeout_second,
                 check=True,
             )
-    
+
         except subprocess.TimeoutExpired as e:
             raise ConversionTimeoutError(
                 "LibreOffice Conversion timeout error") from e
 
         except subprocess.CalledProcessError as e:
-            print(f"[DEBUG] CalledProcessError STDERR: {e.stderr.decode(errors='ignore')}")
+            print(
+                f"[DEBUG] CalledProcessError STDERR: {e.stderr.decode(errors='ignore')}")
             raise ConversionFailedError(
                 e.stderr.decode(errors="ignore")) from e
-        
-        
-        expected_output = output_dir / f"{input_path.stem}.{target_ext.lower()}"
+
+        expected_output = output_dir / \
+            f"{input_path.stem}.{target_ext.lower()}"
         if expected_output.exists():
             return expected_output
 
@@ -94,14 +99,15 @@ class LibreOfficeConverter:
 
 
 class Conversion:
-    def __init__(self, supabase: Client):
+    def __init__(self, supabase: Client, db: Session):
         self.supabase_client = supabase
         self._libreoffice_converter = LibreOfficeConverter()
+        self.job_repo = JobRepository(db)
 
-    def convert_pdf_to_ppt(self, job_id: str, path:str):
+    def convert_pdf_to_ppt(self, job_id: str, path: str, user_id: str):
         """
         Docstring for convert_pdf_to_ppt
-        
+
         :param self: Description
         :param job_id: Description
         :type job_id: str
@@ -110,37 +116,49 @@ class Conversion:
         Converter PDF (supabase) -> PPT -> Supabase
         """
 
+        record = self._create_job_record(
+            job_id, path,
+            user_id,
+            conversion_type="convert_pdf_to_ppt")
+
         try:
 
             file_byte = self.supabase_client.storage.from_(
-                settings.SUPABASE_RAW_BUCKET).download(path=path)   
+                settings.SUPABASE_RAW_BUCKET).download(path=path)
         except Exception as e:
-            print(f"[worker] error downloading file for job {job_id}: {str(e)}")
-            raise FileNotFoundError(f"File not found in storage: {path}") from e
-        
+            print(
+                f"[worker] error downloading file for job {job_id}: {str(e)}")
+            raise FileNotFoundError(
+                f"File not found in storage: {path}") from e
+
         with tempfile.TemporaryDirectory() as tempdir:
             tempdir = Path(tempdir)
 
             suffix = Path(path).suffix.lower()
 
             if suffix != ".pdf":
-                raise ConversionFailedError(f"Unsupported input format: {suffix}")
-            
+                raise ConversionFailedError(
+                    f"Unsupported input format: {suffix}")
+
             input_pdf = tempdir / "input.pdf"
-            output_dir = tempdir 
+            output_dir = tempdir
 
             with open(input_pdf, "wb") as f:
                 f.write(file_byte)
-            
-            output_file = self._libreoffice_converter.convert(input_path=input_pdf, output_dir=output_dir, target_ext='odp')
 
-            output_file = self._libreoffice_converter.convert(input_path=output_file, output_dir=output_dir, target_ext='pptx')
+            output_file = self._libreoffice_converter.convert(
+                input_path=input_pdf, output_dir=output_dir, target_ext='odp')
 
-            if not output_file.exists():    
-                raise ConversionFailedError("Conversion failed: No output file found")
+            output_file = self._libreoffice_converter.convert(
+                input_path=output_file, output_dir=output_dir, target_ext='pptx')
+
+            if not output_file.exists():
+                raise ConversionFailedError(
+                    "Conversion failed: No output file found")
+
             output_storage_path = path.replace(
                 "original.pdf", "converted.pptx")
-            
+
             try:
                 with open(output_file, "rb") as f:
                     self.supabase_client.storage.from_(settings.SUPABASE_CONVERTED_BUCKET).upload(
@@ -152,14 +170,15 @@ class Conversion:
                         },
                     )
             except Exception as e:
-                print(f"[worker] error uploading file for job {job_id}: {str(e)}")
+                print(
+                    f"[worker] error uploading file for job {job_id}: {str(e)}")
                 raise UploadFailedError(f"Upload failed: {str(e)}") from e
         print(f"[worker] upload complete for job {job_id}")
-            
+
     def convert_docx_to_pdf(self, job_id: str, path: str):
         """
         Docstring for convert_docx_to_pdf
-        
+
         :param self: Description
         :param job_id: Description
         :type job_id: str
@@ -174,16 +193,19 @@ class Conversion:
             file_byte = self.supabase_client.storage.from_(
                 settings.SUPABASE_RAW_BUCKET).download(path=path)
         except Exception as e:
-            print(f"[worker] error downloading file for job {job_id}: {str(e)}")
-            raise FileNotFoundError(f"File not found in storage: {path}") from e
-        
+            print(
+                f"[worker] error downloading file for job {job_id}: {str(e)}")
+            raise FileNotFoundError(
+                f"File not found in storage: {path}") from e
+
         with tempfile.TemporaryDirectory() as tempdir:
             tempdir = Path(tempdir)
 
             suffix = Path(path).suffix.lower()
 
             if suffix != ".docx":
-                raise ConversionFailedError(f"Unsupported input format: {suffix}")
+                raise ConversionFailedError(
+                    f"Unsupported input format: {suffix}")
 
             input_docx = tempdir / 'input.docx'
             output_dir = tempdir / "output.pdf"
@@ -191,13 +213,15 @@ class Conversion:
             with open(input_docx, "wb") as f:
                 f.write(file_byte)
 
-            output_file = self._libreoffice_converter.convert(input_path=input_docx, output_dir=output_dir, target_ext='pdf')
+            output_file = self._libreoffice_converter.convert(
+                input_path=input_docx, output_dir=output_dir, target_ext='pdf')
 
             if not output_file.exists():
-                raise ConversionFailedError("Conversion failed: No output file found")
+                raise ConversionFailedError(
+                    "Conversion failed: No output file found")
             output_storage_path = path.replace(
                 "original.docx", "converted.pdf")
-            
+
             try:
                 with open(output_file, "rb") as f:
                     self.supabase_client.storage.from_(settings.SUPABASE_CONVERTED_BUCKET).upload(
@@ -209,11 +233,10 @@ class Conversion:
                         },
                     )
             except Exception as e:
-                print(f"[worker] error uploading file for job {job_id}: {str(e)}")
+                print(
+                    f"[worker] error uploading file for job {job_id}: {str(e)}")
                 raise UploadFailedError(f"Upload failed: {str(e)}") from e
         print(f"[worker] upload complete for job {job_id}")
-    
-                
 
     def convert_pdf_to_docx(self, job_id: str, path: str):
         """
@@ -229,9 +252,10 @@ class Conversion:
             file_byte = self.supabase_client.storage.from_(
                 settings.SUPABASE_RAW_BUCKET).download(path=path)
         except Exception as e:
-            print(f"[worker] error downloading file for job {job_id}: {str(e)}")
-            raise FileNotFoundError(f"File not found in storage: {path}") from e
-
+            print(
+                f"[worker] error downloading file for job {job_id}: {str(e)}")
+            raise FileNotFoundError(
+                f"File not found in storage: {path}") from e
 
         with tempfile.TemporaryDirectory() as tempdir:
             tempdir = Path(tempdir)
@@ -241,7 +265,7 @@ class Conversion:
             if suffix != ".pdf":
                 raise ConversionFailedError(
                     f"Unsupported input format: {suffix}")
-            
+
             input_pdf = Path(tempdir) / "input.pdf"
             output_dir = Path(tempdir) / "output.docx"
 
@@ -251,18 +275,20 @@ class Conversion:
             try:
                 cv = Converter(str(input_pdf))
                 cv.convert(str(output_dir))
-                cv.close()   
+                cv.close()
             except Exception as e:
-                print(f"[worker] error during conversion for job {job_id}: {str(e)}")     
-                raise ConversionFailedError(f"Conversion failed: {str(e)}") from e
-
+                print(
+                    f"[worker] error during conversion for job {job_id}: {str(e)}")
+                raise ConversionFailedError(
+                    f"Conversion failed: {str(e)}") from e
 
             if not output_dir.exists():
-                raise ConversionFailedError("Conversion failed: No output file found")
-        
+                raise ConversionFailedError(
+                    "Conversion failed: No output file found")
+
             output_storage_path = path.replace(
                 "original.pdf", "converted.docx")
-            
+
             try:
 
                 with open(output_dir, "rb") as f:
@@ -275,10 +301,21 @@ class Conversion:
                         },
                     )
             except Exception as e:
-                print(f"[worker] error uploading file for job {job_id}: {str(e)}")
+                print(
+                    f"[worker] error uploading file for job {job_id}: {str(e)}")
                 raise UploadFailedError(f"Upload failed: {str(e)}") from e
-            
+
         print(f"[worker] upload complete for job {job_id}")
+
+    def _create_job_record(self, job_id, path, user_id, conversion_type):
+        payload = {
+            "id": job_id,
+            "input_url": path,
+            "user_id": user_id,
+            "conversion_type": conversion_type,
+            "status": JobStatus.processing
+        }
+        return self.job_repo.create(**payload)
 
 
 class Compression:
@@ -291,7 +328,7 @@ class Compression:
 
         PDF (supabase) -> Compressed PDF -> Supabase
         """
-        
+
         print(f"[wroker] starting compression for job id {job_id}")
 
         try:
@@ -299,9 +336,10 @@ class Compression:
             file_byte = self.supabase_client.storage.from_(
                 settings.SUPABASE_RAW_BUCKET).download(path=path)
         except Exception as e:
-            print(f"[worker] error downloading file for job {job_id}: {str(e)}")
-            raise FileNotFoundError(f"File not found in storage: {path}") from e
-
+            print(
+                f"[worker] error downloading file for job {job_id}: {str(e)}")
+            raise FileNotFoundError(
+                f"File not found in storage: {path}") from e
 
         with tempfile.TemporaryDirectory() as tempdir:
             tempdir = Path(tempdir)
@@ -311,7 +349,7 @@ class Compression:
             if suffix != ".pdf":
                 raise ConversionFailedError(
                     f"Unsupported input format: {suffix}")
-            
+
             input_pdf = Path(tempdir) / "input.pdf"
             output_pdf = Path(tempdir) / "compressed.pdf"
 
@@ -319,30 +357,33 @@ class Compression:
                 f.write(file_byte)
 
             result = subprocess.run(
-            [
-                "gs",
-                "-sDEVICE=pdfwrite",
-                "-dCompatibilityLevel=1.4",
-                f"-dPDFSETTINGS=/{quality}",
-                "-dNOPAUSE",
-                "-dQUIET",
-                "-dBATCH",
-                f"-sOutputFile={output_pdf}",
-                str(input_pdf),
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+                [
+                    "gs",
+                    "-sDEVICE=pdfwrite",
+                    "-dCompatibilityLevel=1.4",
+                    f"-dPDFSETTINGS=/{quality}",
+                    "-dNOPAUSE",
+                    "-dQUIET",
+                    "-dBATCH",
+                    f"-sOutputFile={output_pdf}",
+                    str(input_pdf),
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
             if result.returncode != 0:
-                print(f"[worker] error during compression for job {job_id}: {result.stderr.decode(errors='ignore')}")
-                raise CompressionFailedError(f"Compression failed: {result.stderr.decode(errors='ignore')}")
-            
+                print(
+                    f"[worker] error during compression for job {job_id}: {result.stderr.decode(errors='ignore')}")
+                raise CompressionFailedError(
+                    f"Compression failed: {result.stderr.decode(errors='ignore')}")
+
             if not output_pdf.exists():
-                raise CompressionFailedError("Compression failed: No output file found")
-            
+                raise CompressionFailedError(
+                    "Compression failed: No output file found")
+
             output_storage_path = path.replace(
                 "original.pdf", "compressed.pdf")
-            
+
             try:
 
                 with open(output_pdf, "rb") as f:
@@ -355,11 +396,12 @@ class Compression:
                         },
                     )
             except Exception as e:
-                print(f"[worker] error uploading file for job {job_id}: {str(e)}")
-                raise UploadFailedError(f"Upload failed: {str(e)}") from e  
-            
+                print(
+                    f"[worker] error uploading file for job {job_id}: {str(e)}")
+                raise UploadFailedError(f"Upload failed: {str(e)}") from e
+
         print(f"[worker] upload complete for job {job_id}")
-            
+
 
 class Customization:
     def __init__(self, supabase: Client):
@@ -393,8 +435,9 @@ class Customization:
     def _merge_pdfs(self, pdf_bytes_list: list[bytes]):
 
         if len(pdf_bytes_list) < 2:
-            raise ValueError("At least two PDF files are required for merging.")
-        
+            raise ValueError(
+                "At least two PDF files are required for merging.")
+
         with tempfile.TemporaryDirectory() as tempdir:
             tempdir = Path(tempdir)
 
@@ -412,11 +455,11 @@ class Customization:
             merger.close()
 
             if not output_pdf_path.exists():
-                raise ConversionFailedError("Merging failed: No output file found")
-            
+                raise ConversionFailedError(
+                    "Merging failed: No output file found")
+
             return output_pdf_path.read_bytes()
 
-        
     def _download_pdf(self, job_id: str, path: list[str]) -> list[bytes]:
         """
         Docstring for download_pdf
@@ -431,6 +474,8 @@ class Customization:
                     settings.SUPABASE_RAW_BUCKET).download(path=p)
                 pdf_bytes.append(file_byte)
             except Exception as e:
-                print(f"[worker] error downloading file for job {job_id}: {str(e)}")
-                raise FileNotFoundError(f"File not found in storage: {p}") from e
+                print(
+                    f"[worker] error downloading file for job {job_id}: {str(e)}")
+                raise FileNotFoundError(
+                    f"File not found in storage: {p}") from e
         return pdf_bytes

@@ -38,6 +38,27 @@ PLAN_CONFIG = {
     }
 }
 
+PUBLIC_PATHS = {"/",
+                "/docs",
+                "/redoc",
+                "/openapi.json",
+                "/favicon.ico",
+                "/health",
+                "/metrics",
+                "/google/login",
+                "/login",
+                "/signup",
+                "/verify-email",
+                "/resend-email-verification",
+                "/reset-password-request",
+                "/reset-password",
+                "/github/login",
+                "/twitter/login",
+                "/google/callback",
+                "/github/callback",
+                "/twitter/callback",
+                }
+
 
 class RatelimiterMiddleware:
 
@@ -56,6 +77,12 @@ class RatelimiterMiddleware:
 
         identifier = get_identifier(request)
         user = getattr(request.state, "user", None)
+
+        path = request.url.path
+
+        if path in PUBLIC_PATHS:
+            await self.app(scope, receive, send)
+            return
 
         if user and user.role == "admin":
             await self.app(scope, receive, send)

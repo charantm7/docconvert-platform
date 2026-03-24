@@ -1,6 +1,6 @@
 import json
 import aio_pika
-from fastapi import APIRouter, HTTPException, Header, status, Depends
+from fastapi import APIRouter, HTTPException, Header, status, Request
 from sqlalchemy.orm import Session
 
 from upload_service.src.api.v1.upload_route.schema import PreSignedSchema, ConvertRequest, MergeRequest
@@ -39,7 +39,7 @@ async def generate_presigned_url(
         "job_id": job_id,
         "bucket": settings.SUPABASE_BUCKET
     }
-# TODO: Merge and conversion endpoints are very similar, can we combine them into one with a type field in the request body to differentiate between merge and conversion jobs?
+
 
 @upload_service.post("/merge/start")
 async def merge_files(body: MergeRequest):
@@ -66,15 +66,11 @@ async def merge_files(body: MergeRequest):
 
     return {"message": "Merge job queued", "job_id": body.job_id}
 
-@upload_service.get("/get")
-async def get_user(db: Session = Depends(get_db)):
-
-    return UserRepository(db).get_by_email("charantm8787@gmail.com")
-
-
 
 @upload_service.post("/conversion/start")
-async def convert_file(body: ConvertRequest):
+async def convert_file(body: ConvertRequest, request: Request):
+
+    user_id = request.state.user.user_id
 
     connection = await get_rabbit_connection()
     channel = await connection.channel()
@@ -82,6 +78,7 @@ async def convert_file(body: ConvertRequest):
     queue = await channel.declare_queue("conversion_queue", durable=True)
 
     message = {
+        "user_id": user_id,
         "job_id": body.job_id,
         "path": body.path,
         "target_format": body.target_format
