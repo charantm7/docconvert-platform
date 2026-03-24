@@ -23,7 +23,6 @@ class UserRepository:
     def get_by_id(self, user_id: uuid.UUID) -> User | None:
         return self.db.get(User, user_id)
         
-    @handle_db_error(stage="get_user_by_email", message="Database error while fetching user by email")
     def get_by_email(self, email: str) -> User | None:   
         stmt = select(User).where(User.email == email)
         return self.db.execute(stmt).scalar_one_or_none()

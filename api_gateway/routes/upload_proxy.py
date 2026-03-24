@@ -2,14 +2,14 @@
 import httpx
 from fastapi import APIRouter, Request, Response, Depends, HTTPException
 
-from api_gateway.middleware.ratelimiter import limiter, get_limiter_for_user, dynamic_limit
 from ..settings import settings
 
 upload = APIRouter()
 
 _client = httpx.AsyncClient(timeout=10)
 
-STRIP_REQUEST_HEADERS  = {"host", "content-length", "connection", "transfer-encoding"}
+STRIP_REQUEST_HEADERS = {"host", "content-length",
+                         "connection", "transfer-encoding"}
 STRIP_RESPONSE_HEADERS = {"content-length", "connection", "transfer-encoding"}
 
 
@@ -22,27 +22,26 @@ def _forward_headers(request: Request) -> dict:
 
     headers["User-Id"] = request.state.user.user_id
     headers["Request-Id"] = request.state.request_id
-    headers["X-Auth-Type"]  = request.state.user.auth_type
+    headers["X-Auth-Type"] = request.state.user.auth_type
 
     return headers
+
 
 def _forward_response(upstream: httpx.Response) -> dict:
 
     return Response(
         content=upstream.content,
         status_code=upstream.status_code,
-        headers = {
+        headers={
             key: value
             for key, value in upstream.headers.items()
             if key.lower() not in STRIP_RESPONSE_HEADERS
         },
-        media_type = upstream.headers.get("content-type")
+        media_type=upstream.headers.get("content-type")
     )
 
-    
 
 @upload.post("/v1/upload/presigned")
-@limiter.limit(lambda request: get_limiter_for_user(request=request))
 async def proxy_presigned(request: Request):
 
     try:
@@ -52,20 +51,17 @@ async def proxy_presigned(request: Request):
             json=await request.json()
         )
         return _forward_response(upstream=upstream)
-    
+
     except httpx.TimeoutException:
         raise HTTPException(504, "Upload service timed out")
-    
+
     except httpx.RequestError:
         raise HTTPException(502, "Upload service unreachable")
 
-        
-
 
 @upload.api_route("/v1/upload/{path:path}", methods=["GET", "POST"])
-@limiter.limit(get_limiter_for_user)
 async def proxy_upload(path: str, request: Request):
-    
+
     body = None
     if request.method in ['POST', 'PUT', "PATCH"]:
         body = await request.body()
@@ -80,11 +76,9 @@ async def proxy_upload(path: str, request: Request):
         )
 
         return _forward_response(upstream=upstream_response)
-    
-    
+
     except httpx.TimeoutException:
         raise HTTPException(504, "Upload service timed out")
-    
+
     except httpx.RequestError:
         raise HTTPException(502, "Upload service unreachable")
-

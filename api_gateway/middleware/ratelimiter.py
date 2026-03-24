@@ -1,6 +1,7 @@
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from fastapi import Request, HTTPException
+from starlette.responses import JSONResponse
 
 from api_gateway.settings import settings
 
@@ -73,6 +74,9 @@ class RatelimiterMiddleware:
         )
 
         if not allowed:
-            raise HTTPException(429, "Rate limit exceeded")
+            return JSONResponse(
+                status_code=439,
+                content={"detail": "Rate limit exceeded"}
+            )
 
         await self.app(scope, receive, send)

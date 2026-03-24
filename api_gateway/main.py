@@ -62,7 +62,7 @@ async def lifespan(app: FastAPI):
     redis = await Redis.from_url(
         settings.REDIS_CONNECTION,
         encoding='utf-8',
-        decode_response=True
+        decode_responses=True
     )
 
     script_sha = await redis.script_load(LAU_SCRIPT)

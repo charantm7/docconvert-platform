@@ -1,7 +1,7 @@
 from redis import Redis
 import time
 
-redis_client = Redis(host="redis", port=6379)
+redis_client = Redis(host="redis", port=6379, decode_responses=True)
 
 
 class TokenBucketEngine:
