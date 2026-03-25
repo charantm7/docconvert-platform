@@ -5,6 +5,7 @@ import aio_pika
 from conversion_workers.storage.s3_client import supabase
 from conversion_workers.settings import settings
 from conversion_workers.converter.worker import Conversion, Compression, Customization
+from shared_database.connection import SessionLocal
 
 
 async def start_consumer():
@@ -22,6 +23,7 @@ async def start_consumer():
     async with queue.iterator() as queue_iter:
         async for message in queue_iter:
             async with message.process():
+                db = SessionLocal()
                 try:
                     data = json.loads(message.body)
 
@@ -33,15 +35,15 @@ async def start_consumer():
                     print(f'[worker] recieved job id {job_id}')
 
                     if target_format == "docx":
-                        Conversion(supabase).convert_pdf_to_docx(
-                            job_id, path, )
+                        Conversion(supabase, db).convert_pdf_to_docx(
+                            job_id, path, user_id)
 
                     elif target_format == "pdf":
-                        Conversion(supabase).convert_docx_to_pdf(
+                        Conversion(supabase, db).convert_docx_to_pdf(
                             job_id, path, user_id)
 
                     elif target_format == "pptx":
-                        Conversion(supabase).convert_pdf_to_ppt(
+                        Conversion(supabase, db).convert_pdf_to_ppt(
                             job_id, path, user_id)
 
                     elif target_format == "merge":

@@ -70,7 +70,7 @@ async def merge_files(body: MergeRequest):
 @upload_service.post("/conversion/start")
 async def convert_file(body: ConvertRequest, request: Request):
 
-    user_id = request.state.user.user_id
+    user_id = request.headers.get("User-Id")
 
     connection = await get_rabbit_connection()
     channel = await connection.channel()

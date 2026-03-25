@@ -49,6 +49,24 @@ services:
 
     depends_on:
       - db
+      - rabbitmq
+
+  conversion-service:
+    build:
+      context: .
+      dockerfile: conversion_workers/Dockerfile
+
+    container_name: conversion-service
+
+    depends_on:
+      - db
+      - rabbitmq
+
+    networks:
+      - observability
+
+    volumes:
+      - .:/app
 
   migration:
     build:
@@ -122,6 +140,9 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
+
+    networks:
+      - observability
 
 volumes:
   postgres_data:

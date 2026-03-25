@@ -151,13 +151,16 @@ class JobRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    @handle_db_error("create_job_record", "Error while creating new job record")
-    def create(self, **kwargs) -> Jobs:
-        job_record = Jobs(**kwargs)
+    def create(self, **fields) -> Jobs:
+        job_record = Jobs(**fields)
         self.db.add(job_record)
         self.db.commit()
         self.db.refresh(job_record)
         return job_record
+
+    def update_status(self, record: Jobs, status) -> str:
+        record.status = status
+        self.db.commit()
 
     @handle_db_error("fetch_job_using_id", "Error while fetching job using id")
     def _get_by_job_id(self, id) -> Jobs:
@@ -165,7 +168,6 @@ class JobRepository:
         return self.db.execute(stmt).scalar_one_or_none()
 
     @handle_db_error("update_output_url", "Error while updating output_url job record")
-    def update_output_url(self, job_id, output_url) -> None:
-        record = self._get_by_job_id(job_id)
+    def update_output_url(self, record: Jobs, output_url) -> None:
         record.output_url = output_url
         self.db.commit()

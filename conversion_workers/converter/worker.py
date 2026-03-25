@@ -13,7 +13,7 @@ from conversion_workers.settings import settings
 
 from sqlalchemy.orm import Session
 from shared_database.repository import JobRepository
-from shared_database.models import JobStatus
+from shared_database.models import JobStatus, Jobs
 
 # Exceptions
 from conversion_workers.exception import (
@@ -126,8 +126,7 @@ class Conversion:
             file_byte = self.supabase_client.storage.from_(
                 settings.SUPABASE_RAW_BUCKET).download(path=path)
         except Exception as e:
-            print(
-                f"[worker] error downloading file for job {job_id}: {str(e)}")
+            self._update_status(record, JobStatus.failed)
             raise FileNotFoundError(
                 f"File not found in storage: {path}") from e
 
@@ -137,6 +136,7 @@ class Conversion:
             suffix = Path(path).suffix.lower()
 
             if suffix != ".pdf":
+                self._update_status(record, JobStatus.failed)
                 raise ConversionFailedError(
                     f"Unsupported input format: {suffix}")
 
@@ -153,6 +153,7 @@ class Conversion:
                 input_path=output_file, output_dir=output_dir, target_ext='pptx')
 
             if not output_file.exists():
+                self._update_status(record, JobStatus.failed)
                 raise ConversionFailedError(
                     "Conversion failed: No output file found")
 
@@ -169,13 +170,13 @@ class Conversion:
                             "x-upsert": "true"
                         },
                     )
+                self._update_status(record, output_storage_path)
             except Exception as e:
-                print(
-                    f"[worker] error uploading file for job {job_id}: {str(e)}")
+                self._update_status(record, JobStatus.failed)
                 raise UploadFailedError(f"Upload failed: {str(e)}") from e
         print(f"[worker] upload complete for job {job_id}")
 
-    def convert_docx_to_pdf(self, job_id: str, path: str):
+    def convert_docx_to_pdf(self, job_id: str, path: str, user_id: str):
         """
         Docstring for convert_docx_to_pdf
 
@@ -188,11 +189,17 @@ class Conversion:
         Converter DOCX (supabase) -> PDF -> Supabase
         """
 
+        record = self._create_job_record(
+            job_id, path,
+            user_id,
+            conversion_type="convert_docx_to_pdf")
+
         try:
 
             file_byte = self.supabase_client.storage.from_(
                 settings.SUPABASE_RAW_BUCKET).download(path=path)
         except Exception as e:
+            self._update_status(record, JobStatus.failed)
             print(
                 f"[worker] error downloading file for job {job_id}: {str(e)}")
             raise FileNotFoundError(
@@ -204,6 +211,7 @@ class Conversion:
             suffix = Path(path).suffix.lower()
 
             if suffix != ".docx":
+                self._update_status(record, JobStatus.failed)
                 raise ConversionFailedError(
                     f"Unsupported input format: {suffix}")
 
@@ -217,6 +225,7 @@ class Conversion:
                 input_path=input_docx, output_dir=output_dir, target_ext='pdf')
 
             if not output_file.exists():
+                self._update_status(record, JobStatus.failed)
                 raise ConversionFailedError(
                     "Conversion failed: No output file found")
             output_storage_path = path.replace(
@@ -232,18 +241,26 @@ class Conversion:
                             "x-upsert": "true"
                         },
                     )
+                self._update_status(record, output_storage_path)
+
             except Exception as e:
+                self._update_status(record, JobStatus.failed)
                 print(
                     f"[worker] error uploading file for job {job_id}: {str(e)}")
                 raise UploadFailedError(f"Upload failed: {str(e)}") from e
         print(f"[worker] upload complete for job {job_id}")
 
-    def convert_pdf_to_docx(self, job_id: str, path: str):
+    def convert_pdf_to_docx(self, job_id: str, path: str, user_id: str):
         """
         Docstring for convert_pdf_to_docx
 
         PDF (supabase) -> DOX -> Supabase
         """
+
+        record = self._create_job_record(
+            job_id, path,
+            user_id,
+            conversion_type="convert_pdf_to_docx")
 
         print(f"[wroker] starting convertion for job id {job_id}")
 
@@ -252,6 +269,7 @@ class Conversion:
             file_byte = self.supabase_client.storage.from_(
                 settings.SUPABASE_RAW_BUCKET).download(path=path)
         except Exception as e:
+            self._update_status(record, JobStatus.failed)
             print(
                 f"[worker] error downloading file for job {job_id}: {str(e)}")
             raise FileNotFoundError(
@@ -263,6 +281,7 @@ class Conversion:
             suffix = Path(path).suffix.lower()
 
             if suffix != ".pdf":
+                self._update_status(record, JobStatus.failed)
                 raise ConversionFailedError(
                     f"Unsupported input format: {suffix}")
 
@@ -277,12 +296,14 @@ class Conversion:
                 cv.convert(str(output_dir))
                 cv.close()
             except Exception as e:
+                self._update_status(record, JobStatus.failed)
                 print(
                     f"[worker] error during conversion for job {job_id}: {str(e)}")
                 raise ConversionFailedError(
                     f"Conversion failed: {str(e)}") from e
 
             if not output_dir.exists():
+                self._update_status(record, JobStatus.failed)
                 raise ConversionFailedError(
                     "Conversion failed: No output file found")
 
@@ -300,14 +321,18 @@ class Conversion:
                             "x-upsert": "true"
                         },
                     )
+                self._update_status(record, output_storage_path)
+
             except Exception as e:
+                self._update_status(record, JobStatus.failed)
+
                 print(
                     f"[worker] error uploading file for job {job_id}: {str(e)}")
                 raise UploadFailedError(f"Upload failed: {str(e)}") from e
 
         print(f"[worker] upload complete for job {job_id}")
 
-    def _create_job_record(self, job_id, path, user_id, conversion_type):
+    def _create_job_record(self, job_id, path, user_id, conversion_type) -> Jobs:
         payload = {
             "id": job_id,
             "input_url": path,
@@ -316,6 +341,14 @@ class Conversion:
             "status": JobStatus.processing
         }
         return self.job_repo.create(**payload)
+
+    def _update_status(self, record, status) -> None:
+        self.job_repo.update_status(record, status)
+        return None
+
+    def _update_output_url(self, record, output_path) -> None:
+        self.job_repo.update_output_url(record, output_path)
+        return None
 
 
 class Compression:
