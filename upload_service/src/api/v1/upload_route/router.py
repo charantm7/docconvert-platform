@@ -1,6 +1,6 @@
 import json
 import aio_pika
-from fastapi import APIRouter, HTTPException, Header, status, Request
+from fastapi import APIRouter, HTTPException, Header, status, Request, Depends
 from sqlalchemy.orm import Session
 
 from upload_service.src.api.v1.upload_route.schema import PreSignedSchema, ConvertRequest, MergeRequest
@@ -8,7 +8,8 @@ from upload_service.src.api.v1.upload_route.service import build_storage_path
 from upload_service.src.config.rabbitmq_connection import get_rabbit_connection
 from upload_service.src.storage.supabase_client import supabase
 from shared_database.connection import get_db
-from shared_database.repository import UserRepository
+from shared_database.repository import UserRepository, JobRepository
+from shared_database.models import JobStatus
 from upload_service.settings import settings
 
 upload_service = APIRouter()
@@ -17,7 +18,8 @@ upload_service = APIRouter()
 @upload_service.post("/upload/presigned")
 async def generate_presigned_url(
     body: PreSignedSchema,
-    user_id: str = Header(..., alias="User-Id")
+    user_id: str = Header(..., alias="User-Id"),
+    db: Session = Depends(get_db)
 ):
     if not body.filename:
         raise HTTPException(
@@ -32,6 +34,14 @@ async def generate_presigned_url(
             settings.SUPABASE_BUCKET).create_signed_upload_url(file_path)
     except Exception as e:
         raise HTTPException(500, f"Supabase error: {str(e)}")
+
+    repo = JobRepository(db)
+
+    repo.create(
+        id=job_id,
+        user_id=user_id,
+        status=JobStatus.processing,
+    )
 
     return {
         "upload_url": signed["signedUrl"],

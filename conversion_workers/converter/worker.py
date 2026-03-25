@@ -116,10 +116,11 @@ class Conversion:
         Converter PDF (supabase) -> PPT -> Supabase
         """
 
-        record = self._create_job_record(
-            job_id, path,
-            user_id,
-            conversion_type="convert_pdf_to_ppt")
+        record = self.job_repo.get_by_job_id(job_id)
+        if not record:
+            raise Exception("Job not found")
+
+        record = self._update_record(record, input_url=path)
 
         try:
 
@@ -170,7 +171,9 @@ class Conversion:
                             "x-upsert": "true"
                         },
                     )
-                self._update_status(record, output_storage_path)
+                self._update_output_url(record, output_storage_path)
+                self._update_status(record, JobStatus.completed)
+
             except Exception as e:
                 self._update_status(record, JobStatus.failed)
                 raise UploadFailedError(f"Upload failed: {str(e)}") from e
@@ -189,10 +192,11 @@ class Conversion:
         Converter DOCX (supabase) -> PDF -> Supabase
         """
 
-        record = self._create_job_record(
-            job_id, path,
-            user_id,
-            conversion_type="convert_docx_to_pdf")
+        record = self.job_repo.get_by_job_id(job_id)
+        if not record:
+            raise Exception("Job not found")
+
+        record = self._update_record(record, input_url=path)
 
         try:
 
@@ -241,7 +245,8 @@ class Conversion:
                             "x-upsert": "true"
                         },
                     )
-                self._update_status(record, output_storage_path)
+                self._update_output_url(record, output_storage_path)
+                self._update_status(record, JobStatus.completed)
 
             except Exception as e:
                 self._update_status(record, JobStatus.failed)
@@ -257,10 +262,11 @@ class Conversion:
         PDF (supabase) -> DOX -> Supabase
         """
 
-        record = self._create_job_record(
-            job_id, path,
-            user_id,
-            conversion_type="convert_pdf_to_docx")
+        record = self.job_repo.get_by_job_id(job_id)
+        if not record:
+            raise Exception("Job not found")
+
+        record = self._update_record(record, input_url=path)
 
         print(f"[wroker] starting convertion for job id {job_id}")
 
@@ -321,7 +327,8 @@ class Conversion:
                             "x-upsert": "true"
                         },
                     )
-                self._update_status(record, output_storage_path)
+                self._update_output_url(record, output_storage_path)
+                self._update_status(record, JobStatus.completed)
 
             except Exception as e:
                 self._update_status(record, JobStatus.failed)
@@ -346,9 +353,8 @@ class Conversion:
         self.job_repo.update_status(record, status)
         return None
 
-    def _update_output_url(self, record, output_path) -> None:
-        self.job_repo.update_output_url(record, output_path)
-        return None
+    def _update_record(self, record, **kw) -> Jobs:
+        return self.job_repo.update_records(record, **kw)
 
 
 class Compression:

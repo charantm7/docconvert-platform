@@ -51,6 +51,25 @@ services:
       - db
       - rabbitmq
 
+  download-service:
+    build:
+      context: .
+      dockerfile: download_service/Dockerfile
+
+    container_name: download-service
+
+    volumes:
+      - .:/app
+
+    ports:
+      - "8003:8003"
+
+    networks:
+      - observability
+
+    depends_on:
+      - db
+
   conversion-service:
     build:
       context: .

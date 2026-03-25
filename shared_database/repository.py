@@ -163,9 +163,20 @@ class JobRepository:
         self.db.commit()
 
     @handle_db_error("fetch_job_using_id", "Error while fetching job using id")
-    def _get_by_job_id(self, id) -> Jobs:
+    def get_by_job_id(self, id) -> Jobs:
         stmt = select(Jobs).where(Jobs.id == id)
         return self.db.execute(stmt).scalar_one_or_none()
+
+    def update_records(self, record, **kwargs):
+
+        for key, value in kwargs.items():
+            setattr(record, key, value)
+
+        self.db.add(record)
+        self.db.commit()
+        self.db.refresh(record)
+
+        return record
 
     @handle_db_error("update_output_url", "Error while updating output_url job record")
     def update_output_url(self, record: Jobs, output_url) -> None:

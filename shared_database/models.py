@@ -221,4 +221,5 @@ class Jobs(Base, TimestampMixin):
     conversion_type = Column(
         Enum(ConversionType, name="job_conversion_type"), nullable=False)
     input_url = Column(String, nullable=False)
-    output_url = Column(String)
+    output_url = Column(String, nullable=True)
+    dowload_url = Column(String, nullable=True)

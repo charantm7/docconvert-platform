@@ -15,6 +15,7 @@ from api_gateway.middleware.ratelimiter import RatelimiterMiddleware
 from .authentication.api.router import auth
 from .routes import (
     upload_proxy,
+    download_proxy,
     api_provider_proxy
 )
 from api_gateway.handlers.exception_handlers import register_exception_handlers
@@ -111,6 +112,7 @@ app.add_middleware(RatelimiterMiddleware,
 register_exception_handlers(app)
 
 app.include_router(upload_proxy.upload)
+app.include_router(download_proxy.download)
 app.include_router(api_provider_proxy.api_provider)
 app.include_router(auth)
 
