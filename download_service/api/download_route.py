@@ -20,7 +20,6 @@ async def get_downloadable_link(data: DownloadSchema, db: Session = Depends(get_
 
     conversion = ["convert_pdf_to_ppt",
                   "convert_docx_to_pdf", "convert_pdf_to_docx", "merge_pdf"]
-    compresed = ["compress_pdf"]
 
     repo = JobRepository(db)
     record = repo.get_by_job_id(data.job_id)

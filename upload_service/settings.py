@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     SUPABASE_BUCKET: str
 
     RABBITMQ_URL: str
+    CONVERSION_QUEUE: str
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parents[0]/".env",

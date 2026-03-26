@@ -3,7 +3,7 @@ import enum
 import sqlalchemy
 from uuid import uuid4
 from sqlalchemy.orm import relationship
-from sqlalchemy import Column, ForeignKey, String, Boolean, Date, Enum, DateTime, ARRAY
+from sqlalchemy import Column, ForeignKey, String, Boolean, Date, Enum, DateTime, ARRAY, Integer
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, CITEXT
 from sqlalchemy.sql import func
 
@@ -223,3 +223,5 @@ class Jobs(Base, TimestampMixin):
     input_url = Column(String, nullable=False)
     output_url = Column(String, nullable=True)
     dowload_url = Column(String, nullable=True)
+    retry_count = Column(Integer, nullable=True, default=0)
+    max_retry = Column(Integer, nullable=True, default=3)
