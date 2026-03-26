@@ -55,8 +55,8 @@ async def proxy_presigned(request: Request):
     except httpx.TimeoutException:
         raise HTTPException(504, "Upload service timed out")
 
-    except httpx.RequestError:
-        raise HTTPException(502, "Upload service unreachable")
+    except httpx.RequestError as e:
+        raise HTTPException(502, f"Upload service unreachable {e}")
 
 
 @upload.api_route("/v1/upload/{path:path}", methods=["GET", "POST"])

@@ -87,23 +87,6 @@ services:
     volumes:
       - .:/app
 
-  migration:
-    build:
-      context: .
-      dockerfile: shared_database/Dockerfile
-
-    env_file:
-      - shared_database/.env
-
-    container_name: migration
-    volumes:
-      - .:/app
-
-    networks:
-      - observability
-    depends_on:
-      - db
-
   db:
     image: postgres:15
     environment:

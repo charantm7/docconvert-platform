@@ -219,8 +219,9 @@ class Jobs(Base, TimestampMixin):
         "users.id", ondelete="CASCADE"))
     status = Column(Enum(JobStatus, name="job_status"), nullable=False)
     conversion_type = Column(
-        Enum(ConversionType, name="job_conversion_type"), nullable=False)
-    input_url = Column(String, nullable=False)
+        Enum(ConversionType, name="job_conversion_type"), nullable=True)
+    upload_url = Column(String, nullable=True)
+    input_url = Column(String, nullable=True)
     output_url = Column(String, nullable=True)
     dowload_url = Column(String, nullable=True)
     retry_count = Column(Integer, nullable=True, default=0)

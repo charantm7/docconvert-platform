@@ -120,7 +120,12 @@ class Conversion:
         if not record:
             raise Exception("Job not found")
 
-        record = self._update_record(record, input_url=path)
+        payload = {
+            "input_url": path,
+            "conversion_type": "convert_pdf_to_ppt"
+        }
+
+        record = self._update_record(record, **payload)
 
         try:
 
@@ -195,8 +200,12 @@ class Conversion:
         record = self.job_repo.get_by_job_id(job_id)
         if not record:
             raise Exception("Job not found")
+        payload = {
+            "input_url": path,
+            "conversion_type": "convert_docx_to_pdf"
+        }
 
-        record = self._update_record(record, input_url=path)
+        record = self._update_record(record, **payload)
 
         try:
 
@@ -266,7 +275,12 @@ class Conversion:
         if not record:
             raise Exception("Job not found")
 
-        record = self._update_record(record, input_url=path)
+        payload = {
+            "input_url": path,
+            "conversion_type": "convert_pdf_to_docx"
+        }
+
+        record = self._update_record(record, **payload)
 
         print(f"[wroker] starting convertion for job id {job_id}")
 

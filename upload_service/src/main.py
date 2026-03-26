@@ -1,8 +1,18 @@
 from fastapi import FastAPI
+from contextlib import asynccontextmanager
 
 from upload_service.src.api.routers import upload_service_router
+from upload_service.src.queue.producer import init_rabbitmq
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_rabbitmq()
+
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.include_router(upload_service_router)
 

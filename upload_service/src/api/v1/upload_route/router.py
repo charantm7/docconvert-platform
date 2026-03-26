@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from upload_service.src.api.v1.upload_route.schema import PreSignedSchema, ConvertRequest, MergeRequest
 from upload_service.src.api.v1.upload_route.service import build_storage_path
 from upload_service.src.config.rabbitmq_connection import get_rabbit_connection
+from upload_service.src.queue.producer import publish_job
 from upload_service.src.storage.supabase_client import supabase
 from shared_database.connection import get_db
 from shared_database.repository import UserRepository, JobRepository
@@ -28,6 +29,19 @@ async def generate_presigned_url(
     file_path, job_id = build_storage_path(
         user_id=user_id, filename=body.filename)
 
+    repo = JobRepository(db)
+
+    record = repo.get_by_job_id(job_id)
+
+    if record:
+        return {
+            "upload_url": record.upload_url,
+            "path": record.input_url,
+            "job_id": record.id,
+            "bucket": settings.SUPABASE_BUCKET,
+            "status": record.status
+        }
+
     try:
 
         signed = supabase.storage.from_(
@@ -35,12 +49,11 @@ async def generate_presigned_url(
     except Exception as e:
         raise HTTPException(500, f"Supabase error: {str(e)}")
 
-    repo = JobRepository(db)
-
     repo.create(
         id=job_id,
         user_id=user_id,
         status=JobStatus.processing,
+        upload_url=signed["signedUrl"]
     )
 
     return {
@@ -53,10 +66,6 @@ async def generate_presigned_url(
 
 @upload_service.post("/merge/start")
 async def merge_files(body: MergeRequest):
-    connection = await get_rabbit_connection()
-    channel = await connection.channel()
-
-    queue = await channel.declare_queue("conversion_queue", durable=True)
 
     message = {
         "job_id": body.job_id,
@@ -64,15 +73,7 @@ async def merge_files(body: MergeRequest):
         "target_format": body.target_format
     }
 
-    await channel.default_exchange.publish(
-        aio_pika.Message(
-            body=json.dumps(message).encode(),
-            delivery_mode=aio_pika.DeliveryMode.PERSISTENT
-        ),
-        routing_key=queue.name
-    )
-
-    await connection.close()
+    await publish_job(message)
 
     return {"message": "Merge job queued", "job_id": body.job_id}
 
@@ -82,11 +83,6 @@ async def convert_file(body: ConvertRequest, request: Request):
 
     user_id = request.headers.get("User-Id")
 
-    connection = await get_rabbit_connection()
-    channel = await connection.channel()
-
-    queue = await channel.declare_queue("conversion_queue", durable=True)
-
     message = {
         "user_id": user_id,
         "job_id": body.job_id,
@@ -94,14 +90,6 @@ async def convert_file(body: ConvertRequest, request: Request):
         "target_format": body.target_format
     }
 
-    await channel.default_exchange.publish(
-        aio_pika.Message(
-            body=json.dumps(message).encode(),
-            delivery_mode=aio_pika.DeliveryMode.PERSISTENT
-        ),
-        routing_key=queue.name
-    )
-
-    await connection.close()
+    await publish_job(message)
 
     return {"message": "Conversion job queued", "job_id": body.job_id}
